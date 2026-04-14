@@ -8,25 +8,45 @@ export function setWeatherLabel(weatherLabel, w, live, liveWeatherActive) {
 	weatherLabel.textContent = `${icons[w]} ${w.charAt(0).toUpperCase() + w.slice(1)} · ${mode}`;
 }
 
-export function setLocationWeatherOverlay(env) {
+function formatPresetName(category) {
+	return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+/** @param {object | null | undefined} env API snapshot from WeatherEngine */
+export function setLocationWeatherOverlay(env, weatherState) {
 	const right = document.getElementById("time-overlay-right");
 	const cityEl = document.getElementById("location-display");
 	const wxEl = document.getElementById("location-weather-display");
 	if (!right || !cityEl || !wxEl) return;
 
-	if (!env?.locationKnown) {
+	const live = weatherState?.liveWeatherActive !== false;
+	const locationKnown = Boolean(env?.locationKnown);
+
+	if (live && !locationKnown) {
 		right.hidden = true;
 		return;
 	}
 
 	right.hidden = false;
-	cityEl.textContent = env.placeName || "Local";
+	cityEl.textContent = locationKnown ? env.placeName || "Local" : "Demo";
 
-	const code = env.weather?.code ?? 0;
-	const state = wmoWeatherStateShort(code);
-	const temp = env.weather?.temperature;
-	const tempStr = temp != null && Number.isFinite(temp) ? `${Math.round(temp)}°` : "—";
-	const category = mapToSceneWeather(env).category;
-	const icon = config.weather.icons[category] ?? config.weather.icons.clear;
-	wxEl.textContent = `${icon} ${state} · ${tempStr}`;
+	const icons = config.weather.icons;
+	if (live && locationKnown) {
+		const code = env.weather?.code ?? 0;
+		const state = wmoWeatherStateShort(code);
+		const temp = env.weather?.temperature;
+		const tempStr = temp != null && Number.isFinite(temp) ? `${Math.round(temp)}°` : "—";
+		const category = mapToSceneWeather(env).category;
+		const icon = icons[category] ?? icons.clear;
+		// wxEl.textContent = `${icon} ${state} · ${tempStr} · Live`;
+		wxEl.textContent = `${icon} ${state} · ${tempStr}`;
+	} else {
+		const w = weatherState?.currentWeather ?? "clear";
+		const icon = icons[w] ?? icons.clear;
+		const intNames = ["light", "medium", "strong"];
+		const i = Math.max(0, Math.min(2, weatherState?.demoIntensity ?? 1));
+		const intLabel = intNames[i];
+		// wxEl.textContent = `${icon} ${formatPresetName(w)} · ${intLabel} · Demo`;
+		wxEl.textContent = `${icon} ${formatPresetName(w)} · ${intLabel}`;
+	}
 }

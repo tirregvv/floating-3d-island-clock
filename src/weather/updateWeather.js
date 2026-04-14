@@ -2,7 +2,7 @@ import * as THREE from "three";
 import * as config from "../config.js";
 import { mapToSceneWeather } from "../../weatherEngine.js";
 import { getDayProgress } from "../timeState.js";
-import { setWeatherLabel } from "../ui/weatherUi.js";
+import { setWeatherLabel, setLocationWeatherOverlay } from "../ui/weatherUi.js";
 
 export function isSnowCategory(w) {
 	return w === "snow" || w === "snowstorm";
@@ -134,6 +134,7 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 		wx.weatherStartTime = now;
 		wx.weatherTransition = 0;
 		setWeatherLabel(ctx.weatherLabel, wx.currentWeather, false, wx.liveWeatherActive);
+		setLocationWeatherOverlay(wx.latestApiEnv, wx);
 		if (isSnowCategory(wx.lastWeather) && wx.currentWeather === "clear") wx.snowAccumulation = 0;
 	}
 	wx.weatherTransition = Math.min(1, wx.weatherTransition + dt / wcfg.transitionSeconds);

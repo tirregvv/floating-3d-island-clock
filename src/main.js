@@ -159,6 +159,10 @@ function weatherLabelTitle() {
 	return `Demo: cycle weather. Shift+click: demo intensity (${names[i]}). Tap the timer for live. Forecast: Open-Meteo (open-meteo.com)`;
 }
 
+function refreshLocationWeatherOverlay() {
+	setLocationWeatherOverlay(weatherState.latestApiEnv, weatherState);
+}
+
 setWeatherLabel(weatherLabel, weatherState.currentWeather, true, weatherState.liveWeatherActive);
 weatherLabel.title = weatherLabelTitle();
 
@@ -168,6 +172,7 @@ weatherLabel.addEventListener("click", (e) => {
 		weatherState.weatherStartTime = performance.now();
 		weatherState.weatherTransition = 0;
 		weatherLabel.title = weatherLabelTitle();
+		refreshLocationWeatherOverlay();
 		return;
 	}
 	weatherState.liveWeatherActive = false;
@@ -177,6 +182,7 @@ weatherLabel.addEventListener("click", (e) => {
 	weatherState.weatherTransition = 0;
 	setWeatherLabel(weatherLabel, weatherState.currentWeather, false, weatherState.liveWeatherActive);
 	weatherLabel.title = weatherLabelTitle();
+	refreshLocationWeatherOverlay();
 	if (isSnowCategory(weatherState.lastWeather) && weatherState.currentWeather === "clear") weatherState.snowAccumulation = 0;
 });
 
@@ -192,6 +198,7 @@ weatherCountdown.addEventListener("click", () => {
 	weatherState.weatherStartTime = performance.now();
 	weatherState.weatherTransition = 1;
 	weatherLabel.title = weatherLabelTitle();
+	refreshLocationWeatherOverlay();
 });
 
 weatherEngine = new WeatherEngine({
@@ -203,7 +210,7 @@ weatherEngine = new WeatherEngine({
 	smoothing: config.weatherApi.smoothing,
 	onUpdate: (env) => {
 		weatherState.latestApiEnv = env;
-		setLocationWeatherOverlay(env);
+		setLocationWeatherOverlay(env, weatherState);
 		if (env.latitude != null) observerLat.rad = (env.latitude * Math.PI) / 180;
 		if (weatherState.liveWeatherActive) {
 			const m = mapToSceneWeather(env);

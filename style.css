@@ -229,6 +229,12 @@ canvas {
 
 #fullscreen-toggle {
 	text-align: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 0;
+	padding: 7px 12px;
+	min-width: 40px;
 }
 
 #weather-label {
@@ -362,5 +368,36 @@ html:-webkit-full-screen #fullscreen-toggle {
 
 	#fullscreen-toggle {
 		flex-shrink: 0;
+	}
+
+	/* Fullscreen on small screens: location/weather top-center, time/date bottom-center */
+	html:fullscreen #time-overlay,
+	html:-webkit-full-screen #time-overlay {
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		width: 100%;
+		padding: max(24px, env(safe-area-inset-top, 0)) max(24px, env(safe-area-inset-right, 0))
+			max(24px, env(safe-area-inset-bottom, 0)) max(24px, env(safe-area-inset-left, 0));
+		box-sizing: border-box;
+		flex-direction: column-reverse;
+		justify-content: space-between;
+		align-items: center;
+		text-align: center;
+		gap: 16px;
+	}
+
+	html:fullscreen #time-overlay-left,
+	html:-webkit-full-screen #time-overlay-left {
+		text-align: center;
+		align-self: center;
+	}
+
+	html:fullscreen #time-overlay-right,
+	html:-webkit-full-screen #time-overlay-right {
+		text-align: center;
+		align-self: center;
+		max-width: 100%;
 	}
 }
