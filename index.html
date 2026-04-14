@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%234488FF'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='white' font-size='18' font-family='system-ui'%3E%E2%9B%B0%3C/text%3E%3C/svg%3E" />
+		<title>Stylized floating island 3D web application</title>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				outline: none !important;
+				box-sizing: border-box;
+			}
+			html,
+			body,
+			#root {
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: #000;
+			}
+			canvas {
+				display: block;
+				outline: none !important;
+			}
+			#canvas {
+				position: absolute;
+				top: 0;
+				left: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/index.js"></script>
+	</body>
+</html>
