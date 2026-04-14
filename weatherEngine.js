@@ -2,8 +2,23 @@
  * Open-Meteo client for live weather. Forecast data: https://open-meteo.com/
  */
 
-const STALE_MS = 45 * 60 * 1000;
-const BACKOFF_STEPS_MS = [60_000, 120_000, 300_000, 900_000];
+import { weatherApi, weatherRules } from "./src/config.js";
+
+async function fetchPlaceName(lat, lon, signal) {
+	const url =
+		`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}` +
+		`&longitude=${encodeURIComponent(lon)}&localityLanguage=en`;
+	const res = await fetch(url, { signal });
+	if (!res.ok) return null;
+	let data;
+	try {
+		data = await res.json();
+	} catch {
+		return null;
+	}
+	const name = data.city || data.locality || data.principalSubdivision;
+	return typeof name === "string" && name.trim() ? name.trim() : null;
+}
 
 function hourlyIndexForTime(hourlyTimes, currentIso) {
 	if (!hourlyTimes?.length) return 0;
@@ -39,34 +54,34 @@ export function mapToSceneWeather(env) {
 	let category = "clear";
 	let precipIntensity = 0;
 
-	const snowCodes = [71, 73, 75, 77, 85, 86];
-	const rainHeavy = [65, 82, 92];
-	const rainLight = [51, 53, 55, 56, 57, 61, 63, 66, 67, 80, 81];
-	const thunderCodes = [95, 96, 99];
+	const r = weatherRules;
 
-	if (thunderCodes.includes(code) || thunder.active) {
+	if (r.thunderCodes.includes(code) || thunder.active) {
 		category = "thunderstorm";
 		precipIntensity = 0.75 + thunder.probability * 0.25;
-	} else if (snowCodes.includes(code) || (temp < 1.5 && (rainLight.includes(code) || rainHeavy.includes(code)))) {
+	} else if (
+		r.snowCodes.includes(code) ||
+		(temp < r.snowTempThreshold && (r.rainLight.includes(code) || r.rainHeavy.includes(code)))
+	) {
 		category = "snowstorm";
-		precipIntensity = snowCodes.includes(code) ? 0.85 : 0.45;
-	} else if (rainHeavy.includes(code)) {
+		precipIntensity = r.snowCodes.includes(code) ? 0.85 : 0.45;
+	} else if (r.rainHeavy.includes(code)) {
 		category = "rain";
 		precipIntensity = 0.9;
-	} else if (rainLight.includes(code)) {
+	} else if (r.rainLight.includes(code)) {
 		category = "rain";
 		precipIntensity = code >= 61 ? 0.55 : 0.35;
-	} else if (code >= 1 && code <= 3) {
+	} else if (code >= r.cloudyCodeMin && code <= r.cloudyCodeMax) {
 		category = "cloudy";
 		precipIntensity = 0;
-	} else if (windSpeed > 35) {
+	} else if (windSpeed > r.windSpeedWindy) {
 		category = "windy";
 		precipIntensity = 0;
 	} else {
 		category = "clear";
 	}
 
-	const windStrength = Math.min(1, windSpeed / 40);
+	const windStrength = Math.min(1, windSpeed / r.windStrengthDivisor);
 	const cloudDensity = Math.min(1, cloudD + (category === "cloudy" ? 0.25 : 0) + (category === "thunderstorm" ? 0.15 : 0));
 	const thunderActivity = thunder.active ? 0.65 + thunder.probability * 0.35 : thunder.probability * 0.35;
 
@@ -82,12 +97,14 @@ export function mapToSceneWeather(env) {
 
 export default class WeatherEngine {
 	constructor({
-		interval = 60_000,
+		interval = weatherApi.intervalMs,
 		onUpdate = () => {},
 		onError = () => {},
-		smoothing = 0.1,
-		fallbackCoords = { lat: 52.52, lon: 13.405 },
-		geolocationTimeoutMs = 12_000,
+		smoothing = weatherApi.smoothing,
+		fallbackCoords = weatherApi.fallbackCoords,
+		geolocationTimeoutMs = weatherApi.geolocationTimeoutMs,
+		staleMs = weatherApi.staleMs,
+		backoffStepsMs = weatherApi.backoffStepsMs,
 	} = {}) {
 		this.baseInterval = interval;
 		this.interval = interval;
@@ -96,6 +113,8 @@ export default class WeatherEngine {
 		this.smoothing = smoothing;
 		this.fallbackCoords = fallbackCoords;
 		this.geolocationTimeoutMs = geolocationTimeoutMs;
+		this.staleMs = staleMs;
+		this.backoffStepsMs = backoffStepsMs;
 
 		this.coords = null;
 		this.timer = null;
@@ -108,6 +127,8 @@ export default class WeatherEngine {
 		this.pausedWhileHidden = false;
 
 		this.wind = { x: 0, z: 0 };
+		this.coordsFromDevice = false;
+		this.placeName = null;
 	}
 
 	async start() {
@@ -171,7 +192,8 @@ export default class WeatherEngine {
 		} catch (err) {
 			this.consecutiveErrors++;
 			this.onError(err);
-			const step = BACKOFF_STEPS_MS[Math.min(this.consecutiveErrors - 1, BACKOFF_STEPS_MS.length - 1)];
+			const steps = this.backoffStepsMs;
+			const step = steps[Math.min(this.consecutiveErrors - 1, steps.length - 1)];
 			this.interval = Math.max(this.baseInterval, step);
 		}
 		this._scheduleNextTick();
@@ -179,6 +201,8 @@ export default class WeatherEngine {
 
 	_getLocation() {
 		return new Promise((resolve) => {
+			this.coordsFromDevice = false;
+			this.placeName = null;
 			if (!navigator.geolocation) {
 				this.coords = { ...this.fallbackCoords };
 				resolve();
@@ -192,6 +216,7 @@ export default class WeatherEngine {
 			navigator.geolocation.getCurrentPosition(
 				(pos) => {
 					clearTimeout(to);
+					this.coordsFromDevice = true;
 					this.coords = {
 						lat: pos.coords.latitude,
 						lon: pos.coords.longitude,
@@ -215,7 +240,7 @@ export default class WeatherEngine {
 	}
 
 	_mapThunder(code) {
-		const thunderCodes = [95, 96, 99];
+		const thunderCodes = weatherRules.thunderCodes;
 		if (thunderCodes.includes(code)) {
 			return { active: true, probability: 0.8 };
 		}
@@ -311,7 +336,19 @@ export default class WeatherEngine {
 				direction: current.winddirection,
 				vector: wind,
 			},
+
+			locationKnown: this.coordsFromDevice,
+			placeName: this.placeName,
 		};
+
+		if (this.coordsFromDevice && !this.placeName) {
+			try {
+				this.placeName = await fetchPlaceName(lat, lon, signal);
+			} catch {
+				/* ignore */
+			}
+			env.placeName = this.placeName;
+		}
 
 		this.lastEnv = env;
 		this.lastSuccessTime = now.getTime();
@@ -320,6 +357,6 @@ export default class WeatherEngine {
 
 	isStale() {
 		if (!this.lastSuccessTime) return true;
-		return Date.now() - this.lastSuccessTime > STALE_MS;
+		return Date.now() - this.lastSuccessTime > this.staleMs;
 	}
 }

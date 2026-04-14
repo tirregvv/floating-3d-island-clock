@@ -5,39 +5,40 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%234488FF'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='white' font-size='18' font-family='system-ui'%3E%E2%9B%B0%3C/text%3E%3C/svg%3E" />
 		<title>Stylized floating island 3D web application</title>
-		<style>
-			* {
-				margin: 0;
-				padding: 0;
-				outline: none !important;
-				box-sizing: border-box;
-			}
-			html,
-			body,
-			#root {
-				width: 100%;
-				min-height: 100vh;
-				height: 100%;
-				overflow: hidden;
-				background: #000;
-			}
-			body {
-				padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-			}
-			canvas {
-				display: block;
-				outline: none !important;
-				touch-action: none;
-			}
-			#canvas {
-				position: absolute;
-				top: 0;
-				left: 0;
-			}
-		</style>
+		<link rel="stylesheet" href="/style.css" />
 	</head>
 	<body>
-		<div id="root"></div>
-		<script type="module" src="/index.js"></script>
+		<div id="root">
+			<canvas id="canvas"></canvas>
+		</div>
+		<div id="time-overlay">
+			<div id="time-overlay-left">
+				<div id="time-display">00:00:00</div>
+				<div id="date-display">01.01.2025</div>
+			</div>
+			<div id="time-overlay-right" hidden>
+				<div id="location-display"></div>
+				<div id="location-weather-display"></div>
+			</div>
+		</div>
+		<div id="slider-ui">
+			<label id="slider-label" for="time-slider">TIME OF DAY</label>
+			<div id="slider-row">
+				<input type="range" id="time-slider" min="0" max="1440" step="1" value="720" />
+				<button type="button" id="reset-btn">&#8635; Reset</button>
+			</div>
+		</div>
+		<div id="weather-controls">
+			<div id="weather-controls-row">
+				<button type="button" id="fullscreen-toggle" aria-pressed="false" title="Fullscreen"></button>
+				<button
+					type="button"
+					id="weather-label"
+					title="Demo: cycle weather. Forecast: Open-Meteo (open-meteo.com)"
+				></button>
+			</div>
+			<div id="weather-countdown"></div>
+		</div>
+		<script type="module" src="/src/main.js"></script>
 	</body>
 </html>
