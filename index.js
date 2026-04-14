@@ -5,13 +5,14 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 // SCENE SETUP
 // =============================================
 const scene = new THREE.Scene();
+const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/.test(navigator.userAgent);
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(22, 16, 22);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isMobileDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -167,25 +168,28 @@ style.textContent = `
   }
   @media (max-width: 640px) {
     #time-overlay {
-      left: 12px; right: auto; transform: none;
+      left: 12px; right: 12px; transform: none;
       min-width: auto; width: calc(100% - 24px);
       padding: 10px 14px;
+      top: calc(12px + env(safe-area-inset-top, 0));
     }
     #time-display { font-size: 22px; }
     #date-display { font-size: 12px; }
     #slider-ui {
       min-width: auto; width: calc(100% - 24px);
-      bottom: 12px; padding: 10px 14px 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom, 0)); padding: 10px 14px 12px;
     }
     #slider-row { flex-direction: column; align-items: stretch; }
     #reset-btn { width: 100%; margin-top: 10px; }
     #weather-label {
-      top: auto; bottom: 180px; right: 12px; left: auto;
+      top: auto; bottom: calc(190px + env(safe-area-inset-bottom, 0));
+      right: 12px; left: auto;
       transform: none; max-width: calc(100% - 24px);
       white-space: normal;
     }
     #weather-countdown {
-      top: auto; bottom: 142px; right: 12px; left: auto;
+      top: auto; bottom: calc(152px + env(safe-area-inset-bottom, 0));
+      right: 12px; left: auto;
       width: auto;
     }
   }
@@ -522,7 +526,7 @@ scene.add(sunMesh);
 // =============================================
 // LIGHTING
 // =============================================
-const ambientLight = new THREE.AmbientLight(0x8899bb, 0.4);
+const ambientLight = new THREE.AmbientLight(0x8899bb, isMobileDevice ? 0.55 : 0.4);
 scene.add(ambientLight);
 const sunLight = new THREE.DirectionalLight(0xffeedd, 1.2);
 sunLight.castShadow = true;
@@ -535,8 +539,9 @@ sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 55;
 sunLight.shadow.bias = -0.001;
 sunLight.shadow.normalBias = 0.02;
+if (isMobileDevice) sunLight.castShadow = false;
 scene.add(sunLight);
-const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x5c4530, 0.3);
+const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x5c4530, isMobileDevice ? 0.4 : 0.3);
 scene.add(hemisphereLight);
 
 const dayTop = new THREE.Color(0x87ceeb),
@@ -906,8 +911,8 @@ function updateWeather(elapsed, dt) {
 
 	// Ambient dim
 	const weatherDim = isStorm ? 0.45 : isRain ? 0.6 : isCloud ? 0.78 : isSnow ? 0.82 : 1.0;
-	ambientLight.intensity *= weatherDim;
-	sunLight.intensity *= weatherDim;
+	ambientLight.intensity = ambientLight.intensity * weatherDim;
+	sunLight.intensity = sunLight.intensity * weatherDim;
 
 	// Wind sway for base clouds
 	if (isWind) {

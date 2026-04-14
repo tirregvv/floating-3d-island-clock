@@ -16,13 +16,18 @@
 			body,
 			#root {
 				width: 100%;
+				min-height: 100vh;
 				height: 100%;
 				overflow: hidden;
 				background: #000;
 			}
+			body {
+				padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+			}
 			canvas {
 				display: block;
 				outline: none !important;
+				touch-action: none;
 			}
 			#canvas {
 				position: absolute;
