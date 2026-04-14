@@ -63,14 +63,25 @@ export function mapToSceneWeather(env) {
 		r.snowCodes.includes(code) ||
 		(temp < r.snowTempThreshold && (r.rainLight.includes(code) || r.rainHeavy.includes(code)))
 	) {
-		category = "snowstorm";
-		precipIntensity = r.snowCodes.includes(code) ? 0.85 : 0.45;
+		const coldHeavyRain = temp < r.snowTempThreshold && r.rainHeavy.includes(code);
+		const heavySnow = r.snowHeavyCodes.includes(code) || coldHeavyRain;
+		category = heavySnow ? "snowstorm" : "snow";
+		if (category === "snowstorm") {
+			precipIntensity = r.snowCodes.includes(code) ? 0.88 : 0.72;
+		} else {
+			precipIntensity = r.snowCodes.includes(code) ? 0.48 : 0.4;
+		}
 	} else if (r.rainHeavy.includes(code)) {
-		category = "rain";
-		precipIntensity = 0.9;
+		category = "downpour";
+		precipIntensity = 0.92;
 	} else if (r.rainLight.includes(code)) {
-		category = "rain";
-		precipIntensity = code >= 61 ? 0.55 : 0.35;
+		if (r.drizzleCodes.includes(code)) {
+			category = "drizzle";
+			precipIntensity = 0.32;
+		} else {
+			category = "rain";
+			precipIntensity = code >= 66 ? 0.62 : code >= 61 ? 0.55 : 0.4;
+		}
 	} else if (code >= r.cloudyCodeMin && code <= r.cloudyCodeMax) {
 		category = "cloudy";
 		precipIntensity = 0;
@@ -82,7 +93,15 @@ export function mapToSceneWeather(env) {
 	}
 
 	const windStrength = Math.min(1, windSpeed / r.windStrengthDivisor);
-	const cloudDensity = Math.min(1, cloudD + (category === "cloudy" ? 0.25 : 0) + (category === "thunderstorm" ? 0.15 : 0));
+	const cloudDensity = Math.min(
+		1,
+		cloudD +
+			(category === "cloudy" ? 0.25 : 0) +
+			(category === "thunderstorm" ? 0.15 : 0) +
+			(category === "downpour" ? 0.12 : 0) +
+			(category === "snowstorm" ? 0.1 : 0) +
+			(category === "drizzle" ? 0.06 : 0),
+	);
 	const thunderActivity = thunder.active ? 0.65 + thunder.probability * 0.35 : thunder.probability * 0.35;
 
 	return {

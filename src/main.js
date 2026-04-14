@@ -11,7 +11,7 @@ import { buildCelestial } from "./sky/celestial.js";
 import { createMainLights } from "./lights.js";
 import { createSkyPalette } from "./dayNight.js";
 import { buildWeatherEffects } from "./weather/effects.js";
-import { pickNextWeather } from "./weather/updateWeather.js";
+import { pickNextWeather, isSnowCategory } from "./weather/updateWeather.js";
 import { bindTimeUi } from "./ui/timeUi.js";
 import { bindFullscreenToggle } from "./ui/fullscreenUi.js";
 import { setWeatherLabel, setLocationWeatherOverlay } from "./ui/weatherUi.js";
@@ -88,6 +88,7 @@ const weatherState = {
 	weatherStartTime: performance.now(),
 	weatherTransition: 1.0,
 	liveWeatherActive: config.weather.defaultLive,
+	demoIntensity: 1,
 	latestApiEnv: null,
 	snowAccumulation: 0,
 	thunderFlash: 0,
@@ -151,16 +152,32 @@ const dayNightCtx = {
 	observerLat,
 };
 
-setWeatherLabel(weatherLabel, weatherState.currentWeather, true, weatherState.liveWeatherActive);
+function weatherLabelTitle() {
+	const names = ["light", "medium", "strong"];
+	const i = Math.max(0, Math.min(2, weatherState.demoIntensity ?? 1));
+	if (weatherState.liveWeatherActive) return "Live weather (Open-Meteo). Tap the timer for demo mode.";
+	return `Demo: cycle weather. Shift+click: demo intensity (${names[i]}). Tap the timer for live. Forecast: Open-Meteo (open-meteo.com)`;
+}
 
-weatherLabel.addEventListener("click", () => {
+setWeatherLabel(weatherLabel, weatherState.currentWeather, true, weatherState.liveWeatherActive);
+weatherLabel.title = weatherLabelTitle();
+
+weatherLabel.addEventListener("click", (e) => {
+	if (e.shiftKey) {
+		weatherState.demoIntensity = ((weatherState.demoIntensity ?? 1) + 1) % 3;
+		weatherState.weatherStartTime = performance.now();
+		weatherState.weatherTransition = 0;
+		weatherLabel.title = weatherLabelTitle();
+		return;
+	}
 	weatherState.liveWeatherActive = false;
 	weatherState.lastWeather = weatherState.currentWeather;
 	weatherState.currentWeather = pickNextWeather(weatherState.currentWeather);
 	weatherState.weatherStartTime = performance.now();
 	weatherState.weatherTransition = 0;
 	setWeatherLabel(weatherLabel, weatherState.currentWeather, false, weatherState.liveWeatherActive);
-	if (weatherState.lastWeather === "snowstorm" && weatherState.currentWeather === "clear") weatherState.snowAccumulation = 0;
+	weatherLabel.title = weatherLabelTitle();
+	if (isSnowCategory(weatherState.lastWeather) && weatherState.currentWeather === "clear") weatherState.snowAccumulation = 0;
 });
 
 weatherCountdown.addEventListener("click", () => {
@@ -174,6 +191,7 @@ weatherCountdown.addEventListener("click", () => {
 	}
 	weatherState.weatherStartTime = performance.now();
 	weatherState.weatherTransition = 1;
+	weatherLabel.title = weatherLabelTitle();
 });
 
 weatherEngine = new WeatherEngine({
@@ -191,6 +209,7 @@ weatherEngine = new WeatherEngine({
 			const m = mapToSceneWeather(env);
 			weatherState.currentWeather = m.category;
 			setWeatherLabel(weatherLabel, weatherState.currentWeather, true, weatherState.liveWeatherActive);
+			weatherLabel.title = weatherLabelTitle();
 		}
 	},
 	onError: (e) => console.warn("WeatherEngine:", e?.message ?? e),

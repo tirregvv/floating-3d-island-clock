@@ -4,15 +4,29 @@ import { mapToSceneWeather } from "../../weatherEngine.js";
 import { getDayProgress } from "../timeState.js";
 import { setWeatherLabel } from "../ui/weatherUi.js";
 
+export function isSnowCategory(w) {
+	return w === "snow" || w === "snowstorm";
+}
+
+function isRainCategory(w) {
+	return w === "drizzle" || w === "rain" || w === "downpour" || w === "thunderstorm";
+}
+
 function proceduralSceneTargets(currentWeather) {
 	const w = currentWeather;
 	switch (w) {
 		case "thunderstorm":
 			return { cloudDensity: 0.9, fogDensity: 0.12, precipIntensity: 0.85, thunderActivity: 0.9, windStrength: 0.55 };
+		case "downpour":
+			return { cloudDensity: 0.72, fogDensity: 0.11, precipIntensity: 0.92, thunderActivity: 0.12, windStrength: 0.42 };
 		case "rain":
 			return { cloudDensity: 0.55, fogDensity: 0.08, precipIntensity: 0.65, thunderActivity: 0.15, windStrength: 0.25 };
+		case "drizzle":
+			return { cloudDensity: 0.42, fogDensity: 0.06, precipIntensity: 0.3, thunderActivity: 0.02, windStrength: 0.15 };
 		case "snowstorm":
 			return { cloudDensity: 0.75, fogDensity: 0.15, precipIntensity: 0.8, thunderActivity: 0.05, windStrength: 0.35 };
+		case "snow":
+			return { cloudDensity: 0.58, fogDensity: 0.1, precipIntensity: 0.45, thunderActivity: 0.03, windStrength: 0.22 };
 		case "cloudy":
 			return { cloudDensity: 0.72, fogDensity: 0.04, precipIntensity: 0, thunderActivity: 0, windStrength: 0.12 };
 		case "windy":
@@ -20,6 +34,21 @@ function proceduralSceneTargets(currentWeather) {
 		default:
 			return { cloudDensity: 0.15, fogDensity: 0, precipIntensity: 0, thunderActivity: 0, windStrength: 0.08 };
 	}
+}
+
+/** Demo-only: 0 = mild, 1 = default, 2 = stronger (scales procedural targets). */
+function applyDemoIntensityBlend(base, level) {
+	const lo = 0.78;
+	const mid = 1;
+	const hi = 1.22;
+	const s = level <= 0 ? lo : level >= 2 ? hi : mid;
+	return {
+		cloudDensity: THREE.MathUtils.clamp(base.cloudDensity * (0.92 + (level * 0.06)), 0, 1),
+		fogDensity: THREE.MathUtils.clamp(base.fogDensity * (0.75 + level * 0.15), 0, 1),
+		precipIntensity: THREE.MathUtils.clamp(base.precipIntensity * s, 0, 1),
+		thunderActivity: THREE.MathUtils.clamp(base.thunderActivity * (0.88 + level * 0.08), 0, 1),
+		windStrength: THREE.MathUtils.clamp(base.windStrength * (0.88 + level * 0.1), 0, 1),
+	};
 }
 
 export function pickNextWeather(prev) {
@@ -31,9 +60,12 @@ export function pickNextWeather(prev) {
 	const weights = {
 		clear: dw.clear,
 		cloudy: dw.cloudy,
+		drizzle: dw.drizzle,
 		rain: dw.rain,
+		downpour: dw.downpour,
 		windy: dw.windy,
 		thunderstorm: isNight ? dw.thunderstormNight : dw.thunderstormDay,
+		snow: dw.snow,
 		snowstorm: dw.snowstorm,
 	};
 	weights[prev] = 0;
@@ -68,7 +100,10 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 	const elapsed_since = now - wx.weatherStartTime;
 	const { baselines } = dayState;
 
-	const proc = proceduralSceneTargets(wx.currentWeather);
+	let proc = proceduralSceneTargets(wx.currentWeather);
+	if (!wx.liveWeatherActive) {
+		proc = applyDemoIntensityBlend(proc, wx.demoIntensity ?? 1);
+	}
 	const mapLive = wx.latestApiEnv ? mapToSceneWeather(wx.latestApiEnv) : proc;
 	const wxTarget = wx.liveWeatherActive && wx.latestApiEnv ? mapLive : proc;
 	const windOsc = {
@@ -99,19 +134,19 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 		wx.weatherStartTime = now;
 		wx.weatherTransition = 0;
 		setWeatherLabel(ctx.weatherLabel, wx.currentWeather, false, wx.liveWeatherActive);
-		if (wx.lastWeather === "snowstorm" && wx.currentWeather === "clear") wx.snowAccumulation = 0;
+		if (isSnowCategory(wx.lastWeather) && wx.currentWeather === "clear") wx.snowAccumulation = 0;
 	}
 	wx.weatherTransition = Math.min(1, wx.weatherTransition + dt / wcfg.transitionSeconds);
 	const tw = wx.weatherTransition;
 
 	const cloudBoost = wx.smoothedWx.cloudDensity;
-	const isRain =
-		(wx.currentWeather === "rain" || wx.currentWeather === "thunderstorm") && wx.smoothedWx.precipIntensity > 0.08;
+	const isDrizzle = wx.currentWeather === "drizzle";
+	const isRain = isRainCategory(wx.currentWeather) && wx.smoothedWx.precipIntensity > 0.08;
 	const isWind = wx.currentWeather === "windy" || wx.smoothedWx.windStrength > 0.45;
-	const isSnow = wx.currentWeather === "snowstorm" && wx.smoothedWx.precipIntensity > 0.06;
+	const isSnow = isSnowCategory(wx.currentWeather) && wx.smoothedWx.precipIntensity > 0.06;
 	const isCloud = wx.currentWeather === "cloudy" || cloudBoost > 0.55;
 	const isStorm = wx.currentWeather === "thunderstorm" || wx.smoothedWx.thunderActivity > 0.45;
-	const isHeavy = isRain || isStorm || isSnow;
+	const isHeavy = isStorm || isSnow || (isRain && !isDrizzle);
 
 	const stormCloudTarget = Math.min(0.92, (isCloud || isHeavy ? 0.78 : 0) * tw * (0.55 + cloudBoost * 0.55));
 	const cloudCol = isRain || isStorm ? 0x555566 : isSnow ? 0x99aabb : 0x9999aa;
@@ -148,7 +183,7 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 		}
 	}
 
-	const weatherDim = isStorm ? 0.45 : isRain ? 0.6 : isCloud ? 0.78 : isSnow ? 0.82 : 1.0;
+	const weatherDim = isStorm ? 0.45 : isDrizzle ? 0.85 : isRain ? 0.6 : isCloud ? 0.78 : isSnow ? 0.82 : 1.0;
 	const apiDim = 1 - wx.smoothedWx.fogDensity * 0.35;
 	const dim = weatherDim * apiDim;
 
@@ -228,7 +263,7 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 
 	if (isSnow) {
 		wx.snowAccumulation = Math.min(1, wx.snowAccumulation + dt * wcfg.snowAccumRate * wx.smoothedWx.precipIntensity);
-	} else if (wx.currentWeather === "clear" && wx.lastWeather === "snowstorm") {
+	} else if (wx.currentWeather === "clear" && isSnowCategory(wx.lastWeather)) {
 		wx.snowAccumulation = Math.max(0, wx.snowAccumulation - dt * wcfg.snowMeltRate);
 	}
 	const target = wx.snowAccumulation * wcfg.snowTargetScale;
