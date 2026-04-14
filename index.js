@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import WeatherEngine, { mapToSceneWeather } from "./weatherEngine.js";
+
+const prefersReducedMotion =
+	typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // =============================================
 // SCENE SETUP
@@ -18,6 +22,13 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 const root = document.getElementById("root") ?? document.body;
 root.appendChild(renderer.domElement);
+
+const celestialShell = new THREE.Group();
+celestialShell.name = "celestialShell";
+scene.add(celestialShell);
+
+const sceneFog = new THREE.FogExp2(0x05081a, 0);
+scene.fog = sceneFog;
 
 // =============================================
 // ORBIT CONTROLS
@@ -71,17 +82,18 @@ sliderUI.innerHTML = `
 `;
 document.body.appendChild(sliderUI);
 
-// Weather indicator
+// Weather indicator (demo cycle); countdown area resumes live Open-Meteo sync
 const weatherLabel = document.createElement("button");
 weatherLabel.id = "weather-label";
 weatherLabel.type = "button";
-weatherLabel.title = "Click to change weather";
+weatherLabel.title = "Demo: cycle weather. Forecast: Open-Meteo (open-meteo.com)";
 weatherLabel.addEventListener("click", () => {
+	liveWeatherActive = false;
 	lastWeather = currentWeather;
 	currentWeather = pickNextWeather(currentWeather);
 	weatherStartTime = performance.now();
 	weatherTransition = 0;
-	setWeatherLabel(currentWeather);
+	setWeatherLabel(currentWeather, false);
 	if (lastWeather === "snowstorm" && currentWeather === "clear") snowAccumulation = 0;
 });
 document.body.appendChild(weatherLabel);
@@ -164,8 +176,9 @@ style.textContent = `
     background: rgba(0,0,0,0.2); backdrop-filter: blur(8px);
     border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
     padding: 4px 12px; color: rgba(255,255,255,0.5); font-size: 11px;
-    letter-spacing: 1px; pointer-events: none;
+    letter-spacing: 1px; cursor: pointer;
   }
+  #weather-countdown:hover { color: rgba(255,255,255,0.75); }
   @media (max-width: 640px) {
     #time-overlay {
       left: 12px; right: 12px; transform: none;
@@ -492,15 +505,56 @@ for (let i = 0; i < 10; i++) {
 	cloud.position.set((rng() - 0.5) * 28, 7 + rng() * 4, (rng() - 0.5) * 28);
 	cloud.userData.speed = 0.15 + rng() * 0.25;
 	cloud.userData.startX = cloud.position.x;
+	cloud.userData.startZ = cloud.position.z;
 	clouds.push(cloud);
 	scene.add(cloud);
 }
 
 // =============================================
-// MOON
+// MOON (phases: sun direction + earthshine, subtle twinkle on dark side)
 // =============================================
-const moonMat = new THREE.MeshLambertMaterial({ color: 0xdde8ff, emissive: 0x8aaeff, emissiveIntensity: 0.5 });
-const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(1.8, 20, 20), moonMat);
+const moonShaderUniforms = {
+	sunWorldPos: { value: new THREE.Vector3(1, 0, 0) },
+	cameraWorldPos: { value: new THREE.Vector3() },
+	uTime: { value: 0 },
+	moonBrightness: { value: 1 },
+};
+const moonMat = new THREE.ShaderMaterial({
+	uniforms: moonShaderUniforms,
+	vertexShader: `
+		varying vec3 vWorldNormal;
+		varying vec3 vWorldPos;
+		void main() {
+			vWorldNormal = normalize(mat3(modelMatrix) * normal);
+			vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
+	fragmentShader: `
+		uniform vec3 sunWorldPos;
+		uniform vec3 cameraWorldPos;
+		uniform float uTime;
+		uniform float moonBrightness;
+		varying vec3 vWorldNormal;
+		varying vec3 vWorldPos;
+		void main() {
+			vec3 N = normalize(vWorldNormal);
+			vec3 L = normalize(sunWorldPos - vWorldPos);
+			vec3 V = normalize(cameraWorldPos - vWorldPos);
+			float ndotl = dot(N, L);
+			float lit = smoothstep(-0.06, 0.1, ndotl);
+			float facing = max(0.0, dot(N, V));
+			vec3 litCol = vec3(0.88, 0.92, 1.0) * (0.12 + 0.88 * lit) * moonBrightness;
+			vec3 earth = vec3(0.12, 0.14, 0.2) * moonBrightness;
+			vec3 col = mix(earth, litCol, lit);
+			col = mix(vec3(0.02,0.03, 0.06), col, facing);
+			float tw = 0.035 * sin(uTime * 1.2 + vWorldPos.x * 3.5 + vWorldPos.y * 2.1);
+			col += tw * (1.0 - lit) * facing;
+			gl_FragColor = vec4(col, 1.0);
+		}
+	`,
+});
+const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(1.8, 32, 32), moonMat);
 moonMesh.name = "moon";
 scene.add(moonMesh);
 const moonLight = new THREE.DirectionalLight(0x4466dd, 0.0);
@@ -569,7 +623,7 @@ for (let i = 0; i < starCount; i++) {
 starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
 const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.45, sizeAttenuation: true, transparent: true, opacity: 0 });
 const starPoints = new THREE.Points(starGeo, starMat);
-scene.add(starPoints);
+celestialShell.add(starPoints);
 
 const fallingStars = [];
 let nextFallingStarTime = performance.now() + 7000 + Math.random() * 6000;
@@ -630,26 +684,72 @@ function updateFallingStars(dt) {
 }
 
 // =============================================
-// DAY/NIGHT — returns raw computed values for weather to modulate
+// SOLAR — declination from calendar date; hour from getDayProgress()
+// =============================================
+let observerLatitudeRad = (45 / 180) * Math.PI;
+
+function declinationRadFromDate(date) {
+	const start = new Date(date.getFullYear(), 0, 0);
+	const dayOfYear = Math.floor((date - start) / 86400000);
+	return ((23.45 * Math.PI) / 180) * Math.sin((2 * Math.PI * (284 + dayOfYear)) / 365);
+}
+
+function bodyAzEl(latRad, declRad, hourAngle) {
+	const sinElev =
+		Math.sin(latRad) * Math.sin(declRad) + Math.cos(latRad) * Math.cos(declRad) * Math.cos(hourAngle);
+	const elev = Math.asin(THREE.MathUtils.clamp(sinElev, -1, 1));
+	const cosElev = Math.cos(elev);
+	const denom = Math.max(0.001, cosElev);
+	const sinAz = (-Math.sin(hourAngle) * Math.cos(declRad)) / denom;
+	const cosAz =
+		(Math.sin(declRad) * Math.cos(latRad) - Math.cos(declRad) * Math.sin(latRad) * Math.cos(hourAngle)) / denom;
+	const az = Math.atan2(sinAz, cosAz);
+	return { elev, az };
+}
+
+function skyPositionFromAzEl(az, elev, radius, zBias) {
+	const ce = Math.cos(elev),
+		se = Math.sin(elev);
+	return {
+		x: radius * ce * Math.sin(az),
+		y: radius * se,
+		z: radius * ce * Math.cos(az) + zBias,
+	};
+}
+
+const _sunWorldVec = new THREE.Vector3();
+
+// =============================================
+// DAY/NIGHT — seasonal sun, baselines for weather (no compounding dim)
 // =============================================
 function updateDayNightCycle() {
 	const t = getDayProgress();
-	const sunAngle = t * Math.PI * 2 - Math.PI / 2;
-	const moonAngle = sunAngle + Math.PI;
+	const omega = (t - 0.5) * Math.PI * 2;
+	const declRad = declinationRadFromDate(new Date());
+	const latRad = observerLatitudeRad;
+
+	const sunAe = bodyAzEl(latRad, declRad, omega);
+	const moonAe = bodyAzEl(latRad, declRad, omega + Math.PI);
 	const sunDist = 24;
+	const zBias = 7;
 
-	sunLight.position.set(Math.cos(sunAngle) * sunDist, Math.sin(sunAngle) * sunDist, 7);
+	const sunP = skyPositionFromAzEl(sunAe.az, sunAe.elev, sunDist, zBias);
+	const moonP = skyPositionFromAzEl(moonAe.az, moonAe.elev, sunDist, zBias);
+
+	sunLight.position.set(sunP.x, sunP.y, sunP.z);
 	sunLight.target.position.set(0, 0, 0);
-	sunMesh.position.set(Math.cos(sunAngle) * sunDist, Math.sin(sunAngle) * sunDist, 7);
-	sunMesh.visible = sunMesh.position.y > -1.5;
+	sunMesh.position.set(sunP.x, sunP.y, sunP.z);
+	sunMesh.visible = sunP.y > -1.5;
 
-	const moonX = Math.cos(moonAngle) * sunDist;
-	const moonY = Math.sin(moonAngle) * sunDist;
-	moonMesh.position.set(moonX, moonY, 7);
-	moonLight.position.set(moonX, moonY, 7);
+	moonMesh.position.set(moonP.x, moonP.y, moonP.z);
+	moonLight.position.set(moonP.x, moonP.y, moonP.z);
 	moonLight.target.position.set(0, 0, 0);
 
-	const aboveness = Math.sin(sunAngle);
+	_sunWorldVec.set(sunP.x, sunP.y, sunP.z);
+	moonShaderUniforms.sunWorldPos.value.copy(_sunWorldVec);
+	moonShaderUniforms.cameraWorldPos.value.copy(camera.position);
+
+	const aboveness = Math.sin(sunAe.elev);
 	let skyTop, skyBot, sunCol, intensity, ambInt, starOp;
 
 	if (aboveness > 0.15) {
@@ -679,19 +779,18 @@ function updateDayNightCycle() {
 
 	scene.background = skyTop.clone();
 	sunLight.color.copy(sunCol);
-	sunLight.intensity = intensity;
 	sunMat.color.copy(sunCol);
-	ambientLight.intensity = ambInt;
 	ambientLight.color.copy(skyBot);
 	hemisphereLight.color.copy(skyTop);
 	hemisphereLight.groundColor.copy(skyBot);
-	hemisphereLight.intensity = ambInt * 0.8;
-	starMat.opacity = starOp * 0.85;
+
+	const starTwinkle = prefersReducedMotion ? 0 : 0.04 * Math.sin(performance.now() * 0.0021);
+	starMat.opacity = Math.min(0.95, starOp * 0.85 + starOp * starTwinkle);
 
 	const moonAbove = -aboveness;
 	const moonFactor = Math.max(0, Math.min(1, moonAbove / 0.2));
-	moonMesh.visible = moonY > -3;
-	moonMat.emissiveIntensity = 0.3 + moonFactor * 0.85;
+	moonMesh.visible = moonP.y > -3;
+	moonShaderUniforms.moonBrightness.value = 0.35 + moonFactor * 0.95;
 	moonLight.intensity = moonFactor * 0.5;
 
 	const nightFactor = Math.max(0, 1 - (aboveness + 0.15) / 0.3);
@@ -700,7 +799,23 @@ function updateDayNightCycle() {
 	cabinLight.intensity = nightFactor * 1.8;
 	lanternGlowMat.emissiveIntensity = 0.2 + nightFactor * 2.0;
 
-	return { skyTop, aboveness };
+	celestialShell.rotation.set(
+		-latRad * 0.38 - declRad * 0.15,
+		-omega,
+		0,
+		"YXZ",
+	);
+
+	const baselines = {
+		sunIntensity: intensity,
+		ambientIntensity: ambInt,
+		hemisphereIntensity: ambInt * 0.8,
+		sunColor: sunCol.clone(),
+		skyTop: skyTop.clone(),
+		skyBot: skyBot.clone(),
+	};
+
+	return { skyTop, aboveness, baselines, sunAe, omega, declRad };
 }
 
 // ============================================================
@@ -729,10 +844,70 @@ function pickNextWeather(prev) {
 	return "clear";
 }
 
-function setWeatherLabel(w) {
-	weatherLabel.textContent = `${WEATHER_ICONS[w]} ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+let liveWeatherActive = true;
+
+function setWeatherLabel(w, live) {
+	const mode = live !== false && liveWeatherActive ? "Live" : "Demo";
+	weatherLabel.textContent = `${WEATHER_ICONS[w]} ${w.charAt(0).toUpperCase() + w.slice(1)} · ${mode}`;
 }
-setWeatherLabel(currentWeather);
+let latestApiEnv = null;
+let weatherEngine = null;
+const smoothedWx = {
+	cloudDensity: 0,
+	fogDensity: 0,
+	precipIntensity: 0,
+	thunderActivity: 0,
+	windStrength: 0,
+	windDriftX: 0,
+	windDriftZ: 0,
+};
+
+function proceduralSceneTargets() {
+	const w = currentWeather;
+	switch (w) {
+		case "thunderstorm":
+			return { cloudDensity: 0.9, fogDensity: 0.12, precipIntensity: 0.85, thunderActivity: 0.9, windStrength: 0.55 };
+		case "rain":
+			return { cloudDensity: 0.55, fogDensity: 0.08, precipIntensity: 0.65, thunderActivity: 0.15, windStrength: 0.25 };
+		case "snowstorm":
+			return { cloudDensity: 0.75, fogDensity: 0.15, precipIntensity: 0.8, thunderActivity: 0.05, windStrength: 0.35 };
+		case "cloudy":
+			return { cloudDensity: 0.72, fogDensity: 0.04, precipIntensity: 0, thunderActivity: 0, windStrength: 0.12 };
+		case "windy":
+			return { cloudDensity: 0.35, fogDensity: 0.02, precipIntensity: 0, thunderActivity: 0, windStrength: 0.85 };
+		default:
+			return { cloudDensity: 0.15, fogDensity: 0, precipIntensity: 0, thunderActivity: 0, windStrength: 0.08 };
+	}
+}
+
+function smoothToward(smoothed, target, dt, rate = 2.2) {
+	const k = 1 - Math.exp(-rate * dt);
+	for (const key of Object.keys(target)) {
+		smoothed[key] += (target[key] - smoothed[key]) * k;
+	}
+}
+
+const windClamp = 28;
+function windDriftXZ(dt) {
+	const sx = THREE.MathUtils.clamp(smoothedWx.windDriftX, -windClamp, windClamp);
+	const sz = THREE.MathUtils.clamp(smoothedWx.windDriftZ, -windClamp, windClamp);
+	return { x: sx * dt * 0.11, z: sz * dt * 0.09 };
+}
+
+setWeatherLabel(currentWeather, liveWeatherActive);
+
+weatherCountdown.addEventListener("click", () => {
+	liveWeatherActive = true;
+	if (latestApiEnv) {
+		const m = mapToSceneWeather(latestApiEnv);
+		currentWeather = m.category;
+		setWeatherLabel(currentWeather, true);
+	} else {
+		setWeatherLabel(currentWeather, true);
+	}
+	weatherStartTime = performance.now();
+	weatherTransition = 1;
+});
 
 // --- Extra clouds (storm/cloudy) ---
 const stormCloudMats = [];
@@ -751,6 +926,7 @@ for (let i = 0; i < 16; i++) {
 	cloud.position.set((Math.random() - 0.5) * 32, 4 + Math.random() * 3.5, (Math.random() - 0.5) * 32);
 	cloud.userData.speed = 0.18 + Math.random() * 0.28;
 	cloud.userData.baseX = cloud.position.x;
+	cloud.userData.baseZ = cloud.position.z;
 	scene.add(cloud);
 	stormClouds.push(cloud);
 }
@@ -849,95 +1025,135 @@ thunderFill.target.position.set(0, 0, 0);
 scene.add(thunderFill);
 
 // =============================================
-// WEATHER UPDATE — called every frame
+// WEATHER UPDATE — baselines from day/night; API-smoothed intensities
 // =============================================
-function updateWeather(elapsed, dt) {
+function updateWeather(elapsed, dt, dayState) {
 	const now = performance.now();
 	const elapsed_since = now - weatherStartTime;
+	const { baselines } = dayState;
 
-	// Countdown display
-	const remaining = Math.max(0, WEATHER_DURATION_MS - elapsed_since);
-	const rem_s = Math.ceil(remaining / 1000);
-	const rem_m = Math.floor(rem_s / 60);
-	const rem_ss = rem_s % 60;
-	weatherCountdown.textContent = `Next: ${rem_m}:${String(rem_ss).padStart(2, "0")}`;
+	const proc = proceduralSceneTargets();
+	const mapLive = latestApiEnv ? mapToSceneWeather(latestApiEnv) : proc;
+	const wxTarget = liveWeatherActive && latestApiEnv ? mapLive : proc;
+	const windOsc = {
+		windDriftX: proc.windStrength * 22 * Math.sin(elapsed * 0.31 + 0.2),
+		windDriftZ: proc.windStrength * 18 * Math.cos(elapsed * 0.27),
+	};
+	const apiWind =
+		liveWeatherActive && latestApiEnv
+			? { windDriftX: latestApiEnv.wind.vector.x, windDriftZ: latestApiEnv.wind.vector.z }
+			: windOsc;
+	smoothToward(smoothedWx, { ...wxTarget, ...apiWind }, dt);
+	const w = windDriftXZ(dt);
 
-	// Transition to next weather
-	if (elapsed_since > WEATHER_DURATION_MS) {
+	if (liveWeatherActive && weatherEngine?.lastSuccessTime) {
+		const stale = weatherEngine.isStale() ? " · stale" : "";
+		weatherCountdown.textContent = `Live${stale} · Open-Meteo — tap for demo`;
+	} else {
+		const remaining = Math.max(0, WEATHER_DURATION_MS - elapsed_since);
+		const rem_s = Math.ceil(remaining / 1000);
+		const rem_m = Math.floor(rem_s / 60);
+		const rem_ss = rem_s % 60;
+		weatherCountdown.textContent = `Demo ${rem_m}:${String(rem_ss).padStart(2, "0")} · tap for live`;
+	}
+
+	if (!liveWeatherActive && elapsed_since > WEATHER_DURATION_MS) {
 		lastWeather = currentWeather;
 		currentWeather = pickNextWeather(currentWeather);
 		weatherStartTime = now;
 		weatherTransition = 0;
-		setWeatherLabel(currentWeather);
+		setWeatherLabel(currentWeather, false);
 		if (lastWeather === "snowstorm" && currentWeather === "clear") snowAccumulation = 0;
 	}
 	weatherTransition = Math.min(1, weatherTransition + dt / 9);
 	const tw = weatherTransition;
 
-	const isRain = currentWeather === "rain" || currentWeather === "thunderstorm";
-	const isWind = currentWeather === "windy";
-	const isSnow = currentWeather === "snowstorm";
-	const isCloud = currentWeather === "cloudy";
-	const isStorm = currentWeather === "thunderstorm";
+	const cloudBoost = smoothedWx.cloudDensity;
+	const isRain =
+		(currentWeather === "rain" || currentWeather === "thunderstorm") && smoothedWx.precipIntensity > 0.08;
+	const isWind = currentWeather === "windy" || smoothedWx.windStrength > 0.45;
+	const isSnow = currentWeather === "snowstorm" && smoothedWx.precipIntensity > 0.06;
+	const isCloud = currentWeather === "cloudy" || cloudBoost > 0.55;
+	const isStorm = currentWeather === "thunderstorm" || smoothedWx.thunderActivity > 0.45;
 	const isHeavy = isRain || isStorm || isSnow;
 
-	// --- Storm / cloudy extra clouds ---
-	const targetCloudOp = isCloud || isHeavy ? 0.78 * tw : 0;
+	const stormCloudTarget = Math.min(0.92, (isCloud || isHeavy ? 0.78 : 0) * tw * (0.55 + cloudBoost * 0.55));
 	const cloudCol = isRain || isStorm ? 0x555566 : isSnow ? 0x99aabb : 0x9999aa;
 	stormClouds.forEach((cloud, ci) => {
 		cloud.children.forEach((puff) => {
-			puff.material.opacity += (targetCloudOp - puff.material.opacity) * 0.018;
+			puff.material.opacity += (stormCloudTarget - puff.material.opacity) * 0.018;
 			puff.material.color.setHex(cloudCol);
 		});
 		const windShift = isWind ? elapsed * cloud.userData.speed * 1.6 : 0;
-		cloud.position.x = cloud.userData.baseX + Math.sin(elapsed * cloud.userData.speed * 0.35 + ci) * 7 + (windShift % 35);
+		cloud.position.x =
+			cloud.userData.baseX +
+			Math.sin(elapsed * cloud.userData.speed * 0.35 + ci) * 7 +
+			(windShift % 35) +
+			smoothedWx.windDriftX * 0.18;
+		cloud.position.z = cloud.userData.baseZ + smoothedWx.windDriftZ * 0.14 + Math.sin(elapsed * 0.17 + ci) * 1.2;
 	});
 
-	// Dim regular clouds during storm
-	const baseCloudDim = isStorm ? 0.3 : 1.0;
+	const baseCloudDim = isStorm ? Math.min(0.95, 0.3 + cloudBoost * 0.4) : Math.max(0.35, 1 - cloudBoost * 0.35);
 	clouds.forEach((c) =>
 		c.children.forEach((p) => {
-			if (p.material) p.material.opacity = Math.min(0.85, (p.material.opacity || 0.85) * baseCloudDim + (isStorm ? 0 : 0.85 * (1 - baseCloudDim)));
+			const baseOp = 0.85;
+			if (p.material)
+				p.material.opacity = Math.min(
+					0.88,
+					(p.material.opacity || baseOp) * baseCloudDim + (isStorm ? 0 : baseOp * (1 - baseCloudDim)),
+				);
 		}),
 	);
 
-	// --- Sky tint for weather ---
 	if (isCloud || isHeavy) {
 		const grey = isStorm ? new THREE.Color(0x222233) : isSnow ? new THREE.Color(0x99aabb) : new THREE.Color(0x778899);
 		if (scene.background instanceof THREE.Color) {
-			scene.background.lerp(grey, 0.04 * tw);
+			scene.background.lerp(grey, 0.04 * tw * (0.5 + cloudBoost * 0.5));
 		}
 	}
 
-	// Ambient dim
 	const weatherDim = isStorm ? 0.45 : isRain ? 0.6 : isCloud ? 0.78 : isSnow ? 0.82 : 1.0;
-	ambientLight.intensity = ambientLight.intensity * weatherDim;
-	sunLight.intensity = sunLight.intensity * weatherDim;
+	const apiDim = 1 - smoothedWx.fogDensity * 0.35;
+	const dim = weatherDim * apiDim;
 
-	// Wind sway for base clouds
+	ambientLight.intensity = baselines.ambientIntensity * dim;
+	sunLight.intensity = baselines.sunIntensity * dim;
+	sunLight.color.copy(baselines.sunColor);
+	hemisphereLight.intensity = baselines.hemisphereIntensity * dim * (1 - smoothedWx.fogDensity * 0.25);
+
+	const fogD = THREE.MathUtils.clamp(smoothedWx.fogDensity * 0.085, 0, 0.095);
+	sceneFog.color.copy(scene.background);
+	sceneFog.density = fogD;
+
 	if (isWind) {
 		clouds.forEach((cloud) => {
-			cloud.position.x = cloud.userData.startX + elapsed * cloud.userData.speed * 2.2;
+			cloud.position.x =
+				cloud.userData.startX + elapsed * cloud.userData.speed * 2.2 + smoothedWx.windDriftX * 0.12;
+			cloud.position.z = cloud.userData.startZ + smoothedWx.windDriftZ * 0.1;
 			if (cloud.position.x > 20) cloud.userData.startX -= 40;
 		});
+	} else {
+		for (const cloud of clouds) {
+			cloud.position.x =
+				cloud.userData.startX + Math.sin(elapsed * cloud.userData.speed * 0.4) * 5 + smoothedWx.windDriftX * 0.08;
+			cloud.position.z = cloud.userData.startZ + smoothedWx.windDriftZ * 0.06;
+		}
 	}
 
-	// --- Rain ---
-	const rainFraction = isRain ? Math.min(1, tw) : 0;
+	const rainStrength = (isRain ? Math.min(1, tw) : 0) * smoothedWx.precipIntensity;
 	rainDrops.forEach((drop, i) => {
-		drop.visible = i < rainDrops.length * rainFraction;
+		drop.visible = i < rainDrops.length * rainStrength;
 		if (!drop.visible) return;
-		drop.position.x += drop.userData.vx * dt;
+		drop.position.x += (drop.userData.vx + w.x * 0.8) * dt;
 		drop.position.y += drop.userData.vy * dt * (isStorm ? 1.5 : 1);
-		drop.position.z += drop.userData.vz * dt;
+		drop.position.z += (drop.userData.vz + w.z * 0.8) * dt;
 		if (drop.position.y < -5) {
 			drop.position.set((Math.random() - 0.5) * 30, 14 + Math.random() * 8, (Math.random() - 0.5) * 30);
 		}
 	});
 
-	// --- Puddles ---
-	puddleMeshes.forEach((p, i) => {
-		const targetOp = isRain ? 0.4 * tw : 0;
+	puddleMeshes.forEach((p) => {
+		const targetOp = isRain ? 0.4 * tw * smoothedWx.precipIntensity : 0;
 		p.mat.opacity += (targetOp - p.mat.opacity) * 0.015;
 		p.mesh.visible = p.mat.opacity > 0.01;
 		if (p.mesh.visible) {
@@ -946,15 +1162,14 @@ function updateWeather(elapsed, dt) {
 		}
 	});
 
-	// --- Leaves ---
-	const leafFraction = isWind ? Math.min(1, tw) : 0;
+	const leafFraction = (isWind ? Math.min(1, tw) : 0) * Math.min(1, smoothedWx.windStrength * 1.2);
 	leafParticles.forEach((leaf, i) => {
 		leaf.visible = i < leafParticles.length * leafFraction;
 		if (!leaf.visible) return;
 		leaf.userData.wobble += dt * 2.8;
-		leaf.position.x += (leaf.userData.vx + Math.sin(leaf.userData.wobble) * 1.5) * dt;
+		leaf.position.x += (leaf.userData.vx + Math.sin(leaf.userData.wobble) * 1.5 + w.x * 1.2) * dt;
 		leaf.position.y += leaf.userData.vy * dt;
-		leaf.position.z += (leaf.userData.vz + Math.cos(leaf.userData.wobble * 0.7) * 1.2) * dt;
+		leaf.position.z += (leaf.userData.vz + Math.cos(leaf.userData.wobble * 0.7) * 1.2 + w.z * 1.2) * dt;
 		leaf.rotation.z += leaf.userData.spin * dt;
 		leaf.rotation.x += leaf.userData.spin * 0.4 * dt;
 		if (leaf.position.y < -5 || Math.abs(leaf.position.x) > 18) {
@@ -962,23 +1177,21 @@ function updateWeather(elapsed, dt) {
 		}
 	});
 
-	// --- Snowflakes ---
-	const snowFraction = isSnow ? Math.min(1, tw) : 0;
+	const snowStrength = (isSnow ? Math.min(1, tw) : 0) * smoothedWx.precipIntensity;
 	snowFlakes.forEach((flake, i) => {
-		flake.visible = i < snowFlakes.length * snowFraction;
+		flake.visible = i < snowFlakes.length * snowStrength;
 		if (!flake.visible) return;
 		flake.userData.wobble += dt * 1.6;
-		flake.position.x += (flake.userData.vx + Math.sin(flake.userData.wobble * 0.6) * 0.7) * dt;
+		flake.position.x += (flake.userData.vx + Math.sin(flake.userData.wobble * 0.6) * 0.7 + w.x * 0.5) * dt;
 		flake.position.y += flake.userData.vy * dt;
-		flake.position.z += (flake.userData.vz + Math.cos(flake.userData.wobble * 0.4) * 0.7) * dt;
+		flake.position.z += (flake.userData.vz + Math.cos(flake.userData.wobble * 0.4) * 0.7 + w.z * 0.5) * dt;
 		if (flake.position.y < -5) {
 			flake.position.set((Math.random() - 0.5) * 28, 14 + Math.random() * 8, (Math.random() - 0.5) * 28);
 		}
 	});
 
-	// --- Snow accumulation ---
 	if (isSnow) {
-		snowAccumulation = Math.min(1, snowAccumulation + dt * 0.014);
+		snowAccumulation = Math.min(1, snowAccumulation + dt * 0.014 * smoothedWx.precipIntensity);
 	} else if (currentWeather === "clear" && lastWeather === "snowstorm") {
 		snowAccumulation = Math.max(0, snowAccumulation - dt * 0.05);
 	}
@@ -994,20 +1207,22 @@ function updateWeather(elapsed, dt) {
 		mat.opacity += (target - mat.opacity) * 0.04;
 	});
 
-	// --- Thunder ---
-	if (isStorm && now > nextThunder) {
-		thunderFlash = 2 + Math.random() * 1.8;
-		nextThunder = now + 2500 + Math.random() * 7000;
+	const tAct = isStorm ? Math.min(1, tw) * smoothedWx.thunderActivity : 0;
+	const thunderGap = 2500 + (1.15 - tAct) * 7500;
+	if (isStorm && tAct > 0.08 && now > nextThunder) {
+		thunderFlash = (2 + Math.random() * 1.8) * (0.35 + tAct * 0.65);
+		nextThunder = now + thunderGap * (0.5 + Math.random() * 0.5);
 	}
 	if (thunderFlash > 0) {
 		thunderFlash = Math.max(0, thunderFlash - dt * 8);
 		const pulse = 0.65 + Math.sin(elapsed * 34.7) * 0.28;
-		thunderLight.intensity = Math.max(0, thunderFlash * 2.4 * pulse);
-		thunderFill.intensity = Math.max(0, thunderFlash * 1.2 * pulse);
+		const tScale = 0.4 + tAct * 0.6;
+		thunderLight.intensity = Math.max(0, thunderFlash * 2.4 * pulse * tScale);
+		thunderFill.intensity = Math.max(0, thunderFlash * 1.2 * pulse * tScale);
 		if (thunderFlash > 0.6) {
-			ambientLight.intensity = Math.max(ambientLight.intensity, thunderFlash * 0.22);
-			sunLight.intensity = Math.max(sunLight.intensity, thunderFlash * 0.28);
-			hemisphereLight.intensity = Math.max(hemisphereLight.intensity, thunderFlash * 0.18);
+			ambientLight.intensity = Math.max(ambientLight.intensity, thunderFlash * 0.22 * tScale);
+			sunLight.intensity = Math.max(sunLight.intensity, thunderFlash * 0.28 * tScale);
+			hemisphereLight.intensity = Math.max(hemisphereLight.intensity, thunderFlash * 0.18 * tScale);
 			const blueFlash = new THREE.Color(0xadcfff);
 			if (scene.background instanceof THREE.Color) scene.background.lerp(blueFlash, Math.min(0.35, thunderFlash * 0.14));
 		}
@@ -1020,27 +1235,24 @@ function updateWeather(elapsed, dt) {
 // =============================================
 // ANIMATION LOOP
 // =============================================
-const clock = new THREE.Clock();
-let prevElapsed = 0;
+const timer = new THREE.Timer();
 
 function animate() {
-	const elapsed = clock.getElapsedTime();
-	const dt = Math.min(elapsed - prevElapsed, 0.05);
-	prevElapsed = elapsed;
+	timer.update();
+	const elapsed = timer.getElapsed();
+	const dt = Math.min(timer.getDelta(), 0.05);
 
 	islandGroup.rotation.y = elapsed * 0.05;
 
-	starPoints.rotation.y += 0.008 * dt;
-	starPoints.rotation.x = Math.sin(elapsed * 0.18) * 0.004;
 	updateFallingStars(dt);
 
 	for (const cloud of clouds) {
-		cloud.position.x = cloud.userData.startX + Math.sin(elapsed * cloud.userData.speed * 0.4) * 5;
 		cloud.position.y += Math.sin(elapsed * 0.3 + cloud.userData.startX) * 0.0003;
 	}
 
-	updateDayNightCycle();
-	updateWeather(elapsed, dt);
+	const dayState = updateDayNightCycle();
+	moonShaderUniforms.uTime.value = elapsed;
+	updateWeather(elapsed, dt, dayState);
 
 	const flicker = 1 + Math.sin(elapsed * 13.7) * 0.04 + Math.sin(elapsed * 7.3) * 0.03;
 	cabinLight.intensity *= flicker;
@@ -1050,6 +1262,21 @@ function animate() {
 }
 
 renderer.setAnimationLoop(animate);
+
+weatherEngine = new WeatherEngine({
+	interval: 90_000,
+	onUpdate: (env) => {
+		latestApiEnv = env;
+		if (env.latitude != null) observerLatitudeRad = (env.latitude * Math.PI) / 180;
+		if (liveWeatherActive) {
+			const m = mapToSceneWeather(env);
+			currentWeather = m.category;
+			setWeatherLabel(currentWeather, true);
+		}
+	},
+	onError: (e) => console.warn("WeatherEngine:", e?.message ?? e),
+});
+weatherEngine.start().catch((e) => console.warn("WeatherEngine start:", e));
 
 window.addEventListener("resize", () => {
 	camera.aspect = window.innerWidth / window.innerHeight;
