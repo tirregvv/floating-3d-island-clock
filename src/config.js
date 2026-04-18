@@ -36,7 +36,7 @@ export const terrain = {
 };
 
 export const counts = {
-	trees: 28,
+	trees: 32,
 	treeDistMin: 0.1,
 	rocks: 35,
 	rockDistMin: 0.12,
@@ -83,15 +83,18 @@ export const lights = {
 	sunColor: 0xffeedd,
 	sunIntensity: 1.2,
 	sunShadowMapSize: 2048,
+	sunShadowMapSizeMobile: 1024,
 	hemisphereSky: 0x87ceeb,
 	hemisphereGround: 0x5c4530,
 	hemisphereIntensityMobile: 0.4,
 	hemisphereIntensityDesktop: 0.3,
 	moonLightColor: 0x4466dd,
 	moonShadowMapSize: 1024,
+	moonShadowMapSizeMobile: 512,
 	cabinLightColor: 0xffaa33,
 	cabinLightDistance: 6.0,
 	cabinLightShadowMapSize: 512,
+	cabinLightShadowMapSizeMobile: 256,
 };
 
 export const colors = {
@@ -134,6 +137,8 @@ export const colors = {
 	leaf1: 0x4ea843,
 	leaf2: 0xd4a84b,
 	leaf3: 0xc05a2a,
+	deciduousLeaves: 0x5a9f4a,
+	deciduousLeaves2: 0x6eb85a,
 	snowFlake: 0xddeeff,
 	snowCover: 0xeef4ff,
 	thunderPoint: 0x88b8ff,
@@ -189,6 +194,14 @@ export const weather = {
 	windOscZMul: 18,
 	windOscPhase1: 0.31,
 	windOscPhase2: 0.27,
+	/** Multiplier for wind-driven cloud drift/orbit (storm + base clouds) when wind is active. */
+	cloudWindMotionScale: 0.55,
+	/** Max tree foliage bend (radians) around trunk-top pivot at full wind. */
+	treeWindBendMaxRad: 0.12,
+	treeSwayF1Min: 0.52,
+	treeSwayF1Spread: 0.58,
+	treeSwayF2Min: 0.68,
+	treeSwayF2Spread: 0.72,
 	defaultLive: true,
 	icons: {
 		clear: "\u2600\uFE0F",
@@ -223,6 +236,12 @@ export const weather = {
 	opacityLerp: 0.04,
 	thunderDecay: 8,
 	thunderPulseFreq: 34.7,
+	/** Rain streaks (unlit lines): boost when sun is up so they read against bright sky. */
+	rainOpacityMin: 0.52,
+	rainOpacityDay: 0.92,
+	rainLineScaleDay: 1.45,
+	rainDayTint: 0xc8eaff,
+	rainDayTintMix: 0.82,
 };
 
 export const weatherApi = {
@@ -230,6 +249,9 @@ export const weatherApi = {
 	staleMs: 45 * 60 * 1000,
 	backoffStepsMs: [60_000, 120_000, 300_000, 900_000],
 	fallbackCoords: { lat: 52.52, lon: 13.405 },
+	/** First geolocation attempt: short timeout + stale fix OK — fast on mobile reload. */
+	geolocationQuickTimeoutMs: 4_500,
+	geolocationQuickMaxAgeMs: 900_000,
 	geolocationTimeoutMs: 12_000,
 	smoothing: 0.1,
 };

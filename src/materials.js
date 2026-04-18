@@ -19,6 +19,8 @@ export function createMaterials() {
 		trunkMat: new THREE.MeshLambertMaterial({ color: c.trunk }),
 		leavesMat: new THREE.MeshLambertMaterial({ color: c.leaves }),
 		leavesMat2: new THREE.MeshLambertMaterial({ color: c.leaves2 }),
+		deciduousMat: new THREE.MeshLambertMaterial({ color: c.deciduousLeaves }),
+		deciduousMat2: new THREE.MeshLambertMaterial({ color: c.deciduousLeaves2 }),
 		rockMat: new THREE.MeshLambertMaterial({ color: c.rock }),
 		rockMat2: new THREE.MeshLambertMaterial({ color: c.rock2 }),
 		flowerStemMat: new THREE.MeshLambertMaterial({ color: c.flowerStem }),

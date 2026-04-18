@@ -31,7 +31,7 @@ camera.position.set(...cam.position);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.renderer.maxPixelRatio));
-renderer.shadowMap.enabled = !isMobileDevice;
+renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = config.renderer.toneMappingExposure;
@@ -70,11 +70,11 @@ islandGroup.name = "islandGroup";
 scene.add(islandGroup);
 
 const { tilePositions, grassGeo } = buildTerrain(islandGroup, materials, rng);
-const { cabinLight, cabinSnowMaterial } = buildCabin(islandGroup, materials, tilePositions);
+const { cabinLight, cabinSnowMaterial } = buildCabin(islandGroup, materials, tilePositions, isMobileDevice);
 const treeSnowMaterials = [];
-buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials);
+const { treeMeshes } = buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials);
 
-const celestial = buildCelestial(scene, celestialShell, materials, rng);
+const celestial = buildCelestial(scene, celestialShell, materials, rng, isMobileDevice);
 const mainLights = createMainLights(scene, isMobileDevice);
 const skyPalette = createSkyPalette();
 
@@ -88,6 +88,8 @@ const weatherState = {
 	weatherStartTime: performance.now(),
 	weatherTransition: 1.0,
 	liveWeatherActive: config.weather.defaultLive,
+	/** True until first live weather snapshot (geolocation + Open-Meteo) arrives. */
+	awaitingLiveLocation: false,
 	demoIntensity: 1,
 	latestApiEnv: null,
 	snowAccumulation: 0,
@@ -129,6 +131,8 @@ const weatherCtx = {
 	weatherLabel,
 	cabinSnowMaterial,
 	treeSnowMaterials,
+	treeMeshes,
+	prefersReducedMotion,
 };
 
 const dayNightCtx = {
@@ -188,6 +192,7 @@ weatherLabel.addEventListener("click", (e) => {
 
 weatherCountdown.addEventListener("click", () => {
 	weatherState.liveWeatherActive = true;
+	if (!weatherState.latestApiEnv) weatherState.awaitingLiveLocation = true;
 	if (weatherState.latestApiEnv) {
 		const m = mapToSceneWeather(weatherState.latestApiEnv);
 		weatherState.currentWeather = m.category;
@@ -201,14 +206,21 @@ weatherCountdown.addEventListener("click", () => {
 	refreshLocationWeatherOverlay();
 });
 
+if (weatherState.liveWeatherActive) {
+	weatherState.awaitingLiveLocation = true;
+}
+
 weatherEngine = new WeatherEngine({
 	interval: config.weatherApi.intervalMs,
 	staleMs: config.weatherApi.staleMs,
 	backoffStepsMs: config.weatherApi.backoffStepsMs,
 	fallbackCoords: config.weatherApi.fallbackCoords,
 	geolocationTimeoutMs: config.weatherApi.geolocationTimeoutMs,
+	geolocationQuickTimeoutMs: config.weatherApi.geolocationQuickTimeoutMs,
+	geolocationQuickMaxAgeMs: config.weatherApi.geolocationQuickMaxAgeMs,
 	smoothing: config.weatherApi.smoothing,
 	onUpdate: (env) => {
+		weatherState.awaitingLiveLocation = false;
 		weatherState.latestApiEnv = env;
 		setLocationWeatherOverlay(env, weatherState);
 		if (env.latitude != null) observerLat.rad = (env.latitude * Math.PI) / 180;
@@ -219,9 +231,21 @@ weatherEngine = new WeatherEngine({
 			weatherLabel.title = weatherLabelTitle();
 		}
 	},
-	onError: (e) => console.warn("WeatherEngine:", e?.message ?? e),
+	onError: (e) => {
+		console.warn("WeatherEngine:", e?.message ?? e);
+		weatherState.awaitingLiveLocation = false;
+		setLocationWeatherOverlay(weatherState.latestApiEnv, weatherState);
+	},
 });
-weatherEngine.start().catch((e) => console.warn("WeatherEngine start:", e));
+weatherEngine.start().catch((e) => {
+	console.warn("WeatherEngine start:", e);
+	weatherState.awaitingLiveLocation = false;
+	setLocationWeatherOverlay(weatherState.latestApiEnv, weatherState);
+});
+
+if (weatherState.liveWeatherActive) {
+	setLocationWeatherOverlay(weatherState.latestApiEnv, weatherState);
+}
 
 startAnimationLoop({
 	islandGroup,

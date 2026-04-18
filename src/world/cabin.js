@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import * as config from "../config.js";
 
-export function buildCabin(islandGroup, materials, tilePositions) {
+export function buildCabin(islandGroup, materials, tilePositions, isMobileDevice = false) {
 	const {
 		woodMat,
 		roofMat,
@@ -58,7 +58,8 @@ export function buildCabin(islandGroup, materials, tilePositions) {
 	const L = config.lights;
 	const cabinLight = new THREE.PointLight(L.cabinLightColor, 0.0, L.cabinLightDistance);
 	cabinLight.castShadow = true;
-	cabinLight.shadow.mapSize.set(L.cabinLightShadowMapSize, L.cabinLightShadowMapSize);
+	const cabinShadowSz = isMobileDevice ? L.cabinLightShadowMapSizeMobile : L.cabinLightShadowMapSize;
+	cabinLight.shadow.mapSize.set(cabinShadowSz, cabinShadowSz);
 	cabinLight.position.set(0, 0.95, 0.82);
 	cabinGroup.add(cabinLight);
 

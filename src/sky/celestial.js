@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import * as config from "../config.js";
 
-export function buildCelestial(scene, celestialShell, materials, rng) {
+export function buildCelestial(scene, celestialShell, materials, rng, isMobileDevice = false) {
 	const c = config.celestial;
 	const col = config.colors;
 	const clouds = [];
@@ -47,17 +47,59 @@ export function buildCelestial(scene, celestialShell, materials, rng) {
 		uniform float moonBrightness;
 		varying vec3 vWorldNormal;
 		varying vec3 vWorldPos;
+
+		vec3 hash33(vec3 p3) {
+			p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
+			p3 += dot(p3, p3.yxz + 33.33);
+			return fract((p3.xxy + p3.yxx) * p3.zyx);
+		}
+
+		// Shortest distance to a random point in each cell — seamless on a sphere when sampled on N.
+		float worley(vec3 x) {
+			vec3 ix = floor(x);
+			vec3 fx = fract(x);
+			float md = 1.0;
+			for (int a = -1; a <= 1; a++) {
+				for (int b = -1; b <= 1; b++) {
+					for (int c = -1; c <= 1; c++) {
+						vec3 o = vec3(float(a), float(b), float(c));
+						vec3 r = o + hash33(ix + o) - fx;
+						md = min(md, dot(r, r));
+					}
+				}
+			}
+			return sqrt(md);
+		}
+
 		void main() {
 			vec3 N = normalize(vWorldNormal);
 			vec3 L = normalize(sunWorldPos - vWorldPos);
 			vec3 V = normalize(cameraWorldPos - vWorldPos);
 			float ndotl = dot(N, L);
-			float lit = smoothstep(-0.06, 0.1, ndotl);
+			float lit = smoothstep(-0.4, 0.34, ndotl);
+			lit = lit * lit * (3.0 - 2.0 * lit);
 			float facing = max(0.0, dot(N, V));
-			vec3 litCol = vec3(0.88, 0.92, 1.0) * (0.12 + 0.88 * lit) * moonBrightness;
-			vec3 earth = vec3(0.12, 0.14, 0.2) * moonBrightness;
-			vec3 col = mix(earth, litCol, lit);
-			col = mix(vec3(0.02,0.03, 0.06), col, facing);
+
+			vec3 P = N;
+			float wMare = worley(P * 1.25 + vec3(3.7, 0.0, 1.9));
+			float mare = smoothstep(0.22, 0.72, wMare);
+			float wCrater = worley(P * 3.85);
+			float bowl = smoothstep(0.4, 0.028, wCrater);
+			float wFine = worley(P * 11.2 + vec3(41.0, 17.3, 8.1));
+			bowl += smoothstep(0.3, 0.022, wFine) * 0.52;
+			bowl = clamp(bowl, 0.0, 1.0);
+			float craterShade = bowl * (0.27 + 0.14 * lit);
+			float albedo = (1.0 - craterShade) * mix(0.91, 1.0, mare);
+
+			vec3 nightSide = vec3(0.17, 0.19, 0.26) * moonBrightness;
+			vec3 twilight = vec3(0.38, 0.4, 0.48) * moonBrightness;
+			vec3 daySide = vec3(0.82, 0.86, 0.96) * moonBrightness;
+			vec3 col = mix(mix(nightSide, twilight, smoothstep(0.0, 0.65, lit)), daySide, smoothstep(0.35, 1.0, lit));
+			col *= albedo;
+			col *= mix(vec3(0.93, 0.91, 0.96), vec3(1.0), mare * 0.35 + 0.65);
+
+			float limb = smoothstep(0.02, 0.9, facing);
+			col = mix(vec3(0.05, 0.06, 0.09), col, limb);
 			float tw = 0.035 * sin(uTime * 1.2 + vWorldPos.x * 3.5 + vWorldPos.y * 2.1);
 			col += tw * (1.0 - lit) * facing;
 			gl_FragColor = vec4(col, 1.0);
@@ -71,7 +113,8 @@ export function buildCelestial(scene, celestialShell, materials, rng) {
 	const L = config.lights;
 	const moonLight = new THREE.DirectionalLight(L.moonLightColor, 0.0);
 	moonLight.castShadow = true;
-	moonLight.shadow.mapSize.set(L.moonShadowMapSize, L.moonShadowMapSize);
+	const moonShadowSz = isMobileDevice ? L.moonShadowMapSizeMobile : L.moonShadowMapSize;
+	moonLight.shadow.mapSize.set(moonShadowSz, moonShadowSz);
 	moonLight.shadow.camera.left = -16;
 	moonLight.shadow.camera.right = 16;
 	moonLight.shadow.camera.top = 16;
@@ -93,13 +136,17 @@ export function buildCelestial(scene, celestialShell, materials, rng) {
 	const starCount = config.counts.stars;
 	const starGeo = new THREE.BufferGeometry();
 	const starPos = new Float32Array(starCount * 3);
+	// Uniform points on a sphere (infinite-distance star field). Allows stars down to the
+	// astronomical horizon as the celestial shell rotates — unlike the old upper-dome-only layout.
 	for (let i = 0; i < starCount; i++) {
-		const theta = rng() * Math.PI * 2;
-		const phi = rng() * Math.PI;
+		const u = rng() * Math.PI * 2;
+		const v = rng();
+		const cosPhi = 2 * v - 1;
+		const sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
 		const r = c.starRadiusMin + rng() * c.starRadiusExtra;
-		starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-		starPos[i * 3 + 1] = Math.abs(r * Math.cos(phi)) * 0.6 + 20;
-		starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+		starPos[i * 3] = r * sinPhi * Math.cos(u);
+		starPos[i * 3 + 1] = r * cosPhi;
+		starPos[i * 3 + 2] = r * sinPhi * Math.sin(u);
 	}
 	starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
 	const starMat = new THREE.PointsMaterial({

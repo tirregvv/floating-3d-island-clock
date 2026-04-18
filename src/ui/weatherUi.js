@@ -20,6 +20,14 @@ export function setLocationWeatherOverlay(env, weatherState) {
 	if (!right || !cityEl || !wxEl) return;
 
 	const live = weatherState?.liveWeatherActive !== false;
+
+	if (live && weatherState?.awaitingLiveLocation) {
+		right.hidden = false;
+		cityEl.textContent = "Getting location…";
+		wxEl.textContent = "Live weather";
+		return;
+	}
+
 	const locationKnown = Boolean(env?.locationKnown);
 
 	if (live && !locationKnown) {

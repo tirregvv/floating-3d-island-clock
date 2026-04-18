@@ -122,6 +122,8 @@ export default class WeatherEngine {
 		smoothing = weatherApi.smoothing,
 		fallbackCoords = weatherApi.fallbackCoords,
 		geolocationTimeoutMs = weatherApi.geolocationTimeoutMs,
+		geolocationQuickTimeoutMs = weatherApi.geolocationQuickTimeoutMs,
+		geolocationQuickMaxAgeMs = weatherApi.geolocationQuickMaxAgeMs,
 		staleMs = weatherApi.staleMs,
 		backoffStepsMs = weatherApi.backoffStepsMs,
 	} = {}) {
@@ -132,6 +134,8 @@ export default class WeatherEngine {
 		this.smoothing = smoothing;
 		this.fallbackCoords = fallbackCoords;
 		this.geolocationTimeoutMs = geolocationTimeoutMs;
+		this.geolocationQuickTimeoutMs = geolocationQuickTimeoutMs;
+		this.geolocationQuickMaxAgeMs = geolocationQuickMaxAgeMs;
 		this.staleMs = staleMs;
 		this.backoffStepsMs = backoffStepsMs;
 
@@ -227,27 +231,56 @@ export default class WeatherEngine {
 				resolve();
 				return;
 			}
-			const to = setTimeout(() => {
+
+			const apply = (pos) => {
+				this.coordsFromDevice = true;
+				this.coords = {
+					lat: pos.coords.latitude,
+					lon: pos.coords.longitude,
+				};
+			};
+			const useFallback = () => {
 				this.coords = { ...this.fallbackCoords };
-				resolve();
-			}, this.geolocationTimeoutMs);
+			};
+
+			const trySlow = () => {
+				const to = setTimeout(() => {
+					useFallback();
+					resolve();
+				}, this.geolocationTimeoutMs);
+
+				navigator.geolocation.getCurrentPosition(
+					(pos) => {
+						clearTimeout(to);
+						apply(pos);
+						resolve();
+					},
+					() => {
+						clearTimeout(to);
+						useFallback();
+						resolve();
+					},
+					{
+						enableHighAccuracy: false,
+						maximumAge: 120_000,
+						timeout: this.geolocationTimeoutMs,
+					},
+				);
+			};
 
 			navigator.geolocation.getCurrentPosition(
 				(pos) => {
-					clearTimeout(to);
-					this.coordsFromDevice = true;
-					this.coords = {
-						lat: pos.coords.latitude,
-						lon: pos.coords.longitude,
-					};
+					apply(pos);
 					resolve();
 				},
 				() => {
-					clearTimeout(to);
-					this.coords = { ...this.fallbackCoords };
-					resolve();
+					trySlow();
 				},
-				{ enableHighAccuracy: false, maximumAge: 300_000, timeout: this.geolocationTimeoutMs },
+				{
+					enableHighAccuracy: false,
+					maximumAge: this.geolocationQuickMaxAgeMs,
+					timeout: this.geolocationQuickTimeoutMs,
+				},
 			);
 		});
 	}
@@ -360,18 +393,21 @@ export default class WeatherEngine {
 			placeName: this.placeName,
 		};
 
-		if (this.coordsFromDevice && !this.placeName) {
-			try {
-				this.placeName = await fetchPlaceName(lat, lon, signal);
-			} catch {
-				/* ignore */
-			}
-			env.placeName = this.placeName;
-		}
-
 		this.lastEnv = env;
 		this.lastSuccessTime = now.getTime();
 		this.onUpdate(env);
+
+		if (this.coordsFromDevice && !this.placeName) {
+			fetchPlaceName(lat, lon, signal)
+				.then((name) => {
+					if (signal.aborted || !this.isRunning) return;
+					if (typeof name === "string" && name.trim()) this.placeName = name.trim();
+					const env2 = { ...this.lastEnv, placeName: this.placeName };
+					this.lastEnv = env2;
+					this.onUpdate(env2);
+				})
+				.catch(() => {});
+		}
 	}
 
 	isStale() {

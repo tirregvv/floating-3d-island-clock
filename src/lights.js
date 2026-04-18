@@ -10,7 +10,8 @@ export function createMainLights(scene, isMobileDevice) {
 	scene.add(ambientLight);
 	const sunLight = new THREE.DirectionalLight(L.sunColor, L.sunIntensity);
 	sunLight.castShadow = true;
-	sunLight.shadow.mapSize.set(L.sunShadowMapSize, L.sunShadowMapSize);
+	const sunShadowSz = isMobileDevice ? L.sunShadowMapSizeMobile : L.sunShadowMapSize;
+	sunLight.shadow.mapSize.set(sunShadowSz, sunShadowSz);
 	sunLight.shadow.camera.left = -15;
 	sunLight.shadow.camera.right = 15;
 	sunLight.shadow.camera.top = 15;
@@ -19,7 +20,6 @@ export function createMainLights(scene, isMobileDevice) {
 	sunLight.shadow.camera.far = 55;
 	sunLight.shadow.bias = -0.001;
 	sunLight.shadow.normalBias = 0.02;
-	if (isMobileDevice) sunLight.castShadow = false;
 	scene.add(sunLight);
 	const hemisphereLight = new THREE.HemisphereLight(
 		L.hemisphereSky,

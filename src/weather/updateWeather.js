@@ -85,6 +85,9 @@ function smoothToward(smoothed, target, dt, rate) {
 	}
 }
 
+const _rainColScratch = new THREE.Color();
+const _rainDayTint = new THREE.Color();
+
 function windDriftXZ(dt, smoothedWx) {
 	const wc = config.weather.windClamp;
 	const wcfg = config.weather;
@@ -148,6 +151,7 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 	const isCloud = wx.currentWeather === "cloudy" || cloudBoost > 0.55;
 	const isStorm = wx.currentWeather === "thunderstorm" || wx.smoothedWx.thunderActivity > 0.45;
 	const isHeavy = isStorm || isSnow || (isRain && !isDrizzle);
+	const cloudWindMul = isWind ? wcfg.cloudWindMotionScale : 1;
 
 	const stormCloudTarget = Math.min(0.92, (isCloud || isHeavy ? 0.78 : 0) * tw * (0.55 + cloudBoost * 0.55));
 	const cloudCol = isRain || isStorm ? 0x555566 : isSnow ? 0x99aabb : 0x9999aa;
@@ -156,13 +160,14 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 			puff.material.opacity += (stormCloudTarget - puff.material.opacity) * 0.018;
 			puff.material.color.setHex(cloudCol);
 		});
-		const windShift = isWind ? elapsed * cloud.userData.speed * 1.6 : 0;
+		const windShift = isWind ? elapsed * cloud.userData.speed * 1.6 * cloudWindMul : 0;
 		cloud.position.x =
 			cloud.userData.baseX +
 			Math.sin(elapsed * cloud.userData.speed * 0.35 + ci) * 7 +
 			(windShift % 35) +
-			wx.smoothedWx.windDriftX * 0.18;
-		cloud.position.z = cloud.userData.baseZ + wx.smoothedWx.windDriftZ * 0.14 + Math.sin(elapsed * 0.17 + ci) * 1.2;
+			wx.smoothedWx.windDriftX * 0.18 * cloudWindMul;
+		cloud.position.z =
+			cloud.userData.baseZ + wx.smoothedWx.windDriftZ * 0.14 * cloudWindMul + Math.sin(elapsed * 0.17 + ci) * 1.2;
 	});
 
 	const baseCloudDim = isStorm ? Math.min(0.95, 0.3 + cloudBoost * 0.4) : Math.max(0.35, 1 - cloudBoost * 0.35);
@@ -199,10 +204,13 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 
 	if (isWind) {
 		ctx.clouds.forEach((cloud) => {
+			const phase = cloud.userData.startX * 0.31 + cloud.userData.startZ * 0.27;
+			const angle = elapsed * cloud.userData.speed * 1.35 * cloudWindMul + phase;
+			const radius = 6;
 			cloud.position.x =
-				cloud.userData.startX + elapsed * cloud.userData.speed * 2.2 + wx.smoothedWx.windDriftX * 0.12;
-			cloud.position.z = cloud.userData.startZ + wx.smoothedWx.windDriftZ * 0.1;
-			if (cloud.position.x > 20) cloud.userData.startX -= 40;
+				cloud.userData.startX + Math.cos(angle) * radius + wx.smoothedWx.windDriftX * 0.12 * cloudWindMul;
+			cloud.position.z =
+				cloud.userData.startZ + Math.sin(angle) * radius + wx.smoothedWx.windDriftZ * 0.1 * cloudWindMul;
 		});
 	} else {
 		for (const cloud of ctx.clouds) {
@@ -213,9 +221,21 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 	}
 
 	const rainStrength = (isRain ? Math.min(1, tw) : 0) * wx.smoothedWx.precipIntensity;
+	const dn = config.dayNight;
+	const dayRainBlend = isRain
+		? THREE.MathUtils.clamp((dayState.aboveness - dn.abovenessDay) / dn.abovenessTwilight, 0, 1)
+		: 0;
+	_rainDayTint.setHex(wcfg.rainDayTint);
 	ctx.rainDrops.forEach((drop, i) => {
 		drop.visible = i < ctx.rainDrops.length * rainStrength;
-		if (!drop.visible) return;
+		if (!isRain || !drop.visible) {
+			drop.scale.set(1, 1, 1);
+			return;
+		}
+		_rainColScratch.setHex(config.colors.rain).lerp(_rainDayTint, dayRainBlend * wcfg.rainDayTintMix);
+		drop.material.color.copy(_rainColScratch);
+		drop.material.opacity = THREE.MathUtils.lerp(wcfg.rainOpacityMin, wcfg.rainOpacityDay, dayRainBlend);
+		drop.scale.set(1, THREE.MathUtils.lerp(1, wcfg.rainLineScaleDay, dayRainBlend), 1);
 		drop.position.x += (drop.userData.vx + w.x * 0.8) * dt;
 		drop.position.y += drop.userData.vy * dt * (isStorm ? 1.5 : 1);
 		drop.position.z += (drop.userData.vz + w.z * 0.8) * dt;
@@ -235,6 +255,34 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 	});
 
 	const leafFraction = (isWind ? Math.min(1, tw) : 0) * Math.min(1, wx.smoothedWx.windStrength * 1.2);
+
+	const trees = ctx.treeMeshes;
+	if (trees?.length) {
+		const windBlend = (isWind ? Math.min(1, tw) : 0) * Math.min(1, wx.smoothedWx.windStrength * 1.15);
+		const maxBend = wcfg.treeWindBendMaxRad * windBlend;
+		const wc = wcfg.windClamp;
+		const sx = THREE.MathUtils.clamp(wx.smoothedWx.windDriftX / wc, -1, 1);
+		const sz = THREE.MathUtils.clamp(wx.smoothedWx.windDriftZ / wc, -1, 1);
+		for (const tree of trees) {
+			const fol = tree.userData.foliage;
+			if (!fol) continue;
+			if (ctx.prefersReducedMotion || maxBend < 1e-6) {
+				fol.rotation.x = 0;
+				fol.rotation.z = 0;
+				continue;
+			}
+			const ud = tree.userData;
+			const t = elapsed;
+			const mz =
+				0.58 * Math.sin(t * ud.swayF1 + ud.swayP1) + 0.42 * Math.sin(t * ud.swayF2 + ud.swayP2);
+			const mx =
+				0.58 * Math.sin(t * ud.swayF1 * 1.06 + ud.swayP1 + 2.17) +
+				0.42 * Math.sin(t * ud.swayF2 * 0.94 + ud.swayP2 + 1.05);
+			fol.rotation.z = maxBend * (mz * sx + mx * sz * 0.11);
+			fol.rotation.x = maxBend * (-mx * sz + mz * sx * 0.11);
+		}
+	}
+
 	ctx.leafParticles.forEach((leaf, i) => {
 		leaf.visible = i < ctx.leafParticles.length * leafFraction;
 		if (!leaf.visible) return;
