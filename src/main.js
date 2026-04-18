@@ -25,12 +25,36 @@ const scene = new THREE.Scene();
 const isMobileDevice = config.mobileUserAgentRe.test(navigator.userAgent);
 
 const cam = config.camera;
-const camera = new THREE.PerspectiveCamera(cam.fov, window.innerWidth / window.innerHeight, cam.near, cam.far);
+const camera = new THREE.PerspectiveCamera(cam.fov, 1, cam.near, cam.far);
 camera.position.set(...cam.position);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.renderer.maxPixelRatio));
+
+function getDrawableSize() {
+	const vv = window.visualViewport;
+	const w = vv?.width ?? window.innerWidth;
+	const h = vv?.height ?? window.innerHeight;
+	return {
+		width: Math.max(1, Math.floor(w)),
+		height: Math.max(1, Math.floor(h)),
+	};
+}
+
+function applyViewportToGl() {
+	const { width, height } = getDrawableSize();
+	camera.aspect = width / height;
+	if (isMobileDevice && height > width) {
+		camera.fov = cam.fovMobilePortrait ?? 58;
+	} else {
+		camera.fov = cam.fov;
+	}
+	camera.updateProjectionMatrix();
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.renderer.maxPixelRatio));
+	renderer.setSize(width, height);
+}
+
+applyViewportToGl();
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -261,8 +285,18 @@ startAnimationLoop({
 	scene,
 });
 
-window.addEventListener("resize", () => {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
+function onViewportResize() {
+	applyViewportToGl();
+}
+
+window.addEventListener("resize", onViewportResize);
+window.addEventListener("orientationchange", onViewportResize);
+if (window.visualViewport) {
+	window.visualViewport.addEventListener("resize", onViewportResize);
+	window.visualViewport.addEventListener("scroll", onViewportResize);
+}
+
+requestAnimationFrame(() => {
+	applyViewportToGl();
+	requestAnimationFrame(applyViewportToGl);
 });
