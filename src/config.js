@@ -9,8 +9,6 @@ export const renderer = {
 
 export const camera = {
 	fov: 50,
-	/** Wider vertical FOV in portrait so the island stays in frame on tall phones. */
-	fovMobilePortrait: 58,
 	near: 0.1,
 	far: 500,
 	position: [22, 16, 22],
