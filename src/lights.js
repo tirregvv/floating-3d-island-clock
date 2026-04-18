@@ -20,6 +20,7 @@ export function createMainLights(scene, isMobileDevice) {
 	sunLight.shadow.camera.far = 55;
 	sunLight.shadow.bias = -0.001;
 	sunLight.shadow.normalBias = 0.02;
+	if (isMobileDevice) sunLight.castShadow = false;
 	scene.add(sunLight);
 	const hemisphereLight = new THREE.HemisphereLight(
 		L.hemisphereSky,

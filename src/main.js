@@ -55,7 +55,7 @@ function applyViewportToGl() {
 }
 
 applyViewportToGl();
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isMobileDevice;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = config.renderer.toneMappingExposure;
