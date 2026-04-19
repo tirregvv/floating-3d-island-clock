@@ -92,12 +92,12 @@ export function buildCelestial(scene, celestialShell, materials, rng, renderStyl
 			float craterShade = bowl * (0.27 + 0.14 * lit);
 			float albedo = (1.0 - craterShade) * mix(0.91, 1.0, mare);
 
-			vec3 nightSide = vec3(0.17, 0.19, 0.26) * moonBrightness;
-			vec3 twilight = vec3(0.38, 0.4, 0.48) * moonBrightness;
-			vec3 daySide = vec3(0.82, 0.86, 0.96) * moonBrightness;
+			vec3 nightSide = vec3(0.12, 0.16, 0.28) * moonBrightness;
+			vec3 twilight = vec3(0.28, 0.34, 0.50) * moonBrightness;
+			vec3 daySide = vec3(0.50, 0.56, 0.74) * moonBrightness;
 			vec3 col = mix(mix(nightSide, twilight, smoothstep(0.0, 0.65, lit)), daySide, smoothstep(0.35, 1.0, lit));
 			col *= albedo;
-			col *= mix(vec3(0.93, 0.91, 0.96), vec3(1.0), mare * 0.35 + 0.65);
+			col *= mix(vec3(0.68, 0.72, 0.88), vec3(0.55, 0.60, 0.78), mare * 0.35 + 0.65);
 
 			float limb = smoothstep(0.02, 0.9, facing);
 			col = mix(vec3(0.05, 0.06, 0.09), col, limb);

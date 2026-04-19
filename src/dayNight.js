@@ -135,11 +135,15 @@ export function updateDayNightCycle(ctx) {
 	const starTwinkle = prefersReducedMotion ? 0 : dn.starTwinkleCoef * Math.sin(performance.now() * dn.starTwinkleTimeScale);
 	starMat.opacity = Math.min(dn.starOpacityCap, starOp * dn.starOpacityBase + starOp * starTwinkle);
 
-	const moonAbove = -aboveness;
-	const moonFactor = Math.max(0, Math.min(1, moonAbove / dn.moonFactorDivisor));
-	moonMesh.visible = moonP.y > dn.moonVisibilityY;
-	moonShaderUniforms.moonBrightness.value = dn.moonBrightnessMin + moonFactor * dn.moonBrightnessRange;
-	moonLight.intensity = moonFactor * dn.moonLightIntensityScale;
+	const moonVisible = moonP.y > dn.moonVisibilityY;
+	moonMesh.visible = moonVisible;
+	if (moonVisible) {
+		moonShaderUniforms.moonBrightness.value = dn.moonBrightnessVisible;
+		moonLight.intensity = dn.moonLightIntensityScale;
+	} else {
+		moonShaderUniforms.moonBrightness.value = 0;
+		moonLight.intensity = 0;
+	}
 
 	const nightFactor = Math.max(0, 1 - (aboveness + ad) / tw);
 	windowMat.emissiveIntensity = 0.1 + nightFactor * 1.5;
