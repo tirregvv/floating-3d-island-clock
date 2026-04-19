@@ -11,6 +11,8 @@ export function startAnimationLoop({
 	moonShaderUniforms,
 	weatherCtx,
 	cabinLight,
+	fireflies,
+	prefersReducedMotion = false,
 	controls,
 	camera,
 	renderer,
@@ -40,6 +42,10 @@ export function startAnimationLoop({
 		const dayState = updateDayNightCycle(dayNightCtx);
 		moonShaderUniforms.uTime.value = elapsed;
 		updateWeather(elapsed, dt, dayState, weatherCtx);
+
+		if (fireflies) {
+			fireflies.update(dt, elapsed, dayState.nightFactor ?? 0, prefersReducedMotion);
+		}
 
 		const flicker =
 			1 +

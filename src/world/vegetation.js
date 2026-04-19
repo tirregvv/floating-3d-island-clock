@@ -118,6 +118,8 @@ export function buildVegetation(islandGroup, materials, tilePositions, rng, tree
 	}
 
 	const treeMeshes = [];
+	/** Cheap analytic colliders for rocks (sphere centers + radius), used by fireflies / navigation. */
+	const rockColliders = [];
 	const typeList = buildTreeTypeList(rng, n.trees);
 	let placed = 0;
 	let attempts = 0;
@@ -139,7 +141,8 @@ export function buildVegetation(islandGroup, materials, tilePositions, rng, tree
 	for (let i = 0; i < n.rocks; i++) {
 		const tile = tilePositions[Math.floor(rng() * tilePositions.length)];
 		if (tile.dist < n.rockDistMin) continue;
-		const geo = new THREE.DodecahedronGeometry(0.12 + rng() * 0.15, 0);
+		const rockRadius = 0.12 + rng() * 0.15;
+		const geo = new THREE.DodecahedronGeometry(rockRadius, 0);
 		const mat = rng() > 0.5 ? rockMat : rockMat2;
 		const rock = new THREE.Mesh(geo, mat);
 		rock.position.set(tile.x + (rng() - 0.5) * 0.4, tile.y + 0.12, tile.z + (rng() - 0.5) * 0.4);
@@ -148,6 +151,13 @@ export function buildVegetation(islandGroup, materials, tilePositions, rng, tree
 		rock.castShadow = true;
 		rock.receiveShadow = true;
 		islandGroup.add(rock);
+		const rs = Math.max(rock.scale.x, rock.scale.y, rock.scale.z);
+		rockColliders.push({
+			x: rock.position.x,
+			y: rock.position.y,
+			z: rock.position.z,
+			r: rockRadius * rs * 1.15 + 0.04,
+		});
 	}
 
 	for (let i = 0; i < n.flowers; i++) {
@@ -170,5 +180,5 @@ export function buildVegetation(islandGroup, materials, tilePositions, rng, tree
 		islandGroup.add(flower);
 	}
 
-	return { treeMeshes };
+	return { treeMeshes, rockColliders };
 }

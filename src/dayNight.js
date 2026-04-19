@@ -158,5 +158,5 @@ export function updateDayNightCycle(ctx) {
 		skyBot: skyBot.clone(),
 	};
 
-	return { skyTop, aboveness, baselines, sunAe, omega, declRad };
+	return { skyTop, aboveness, baselines, sunAe, omega, declRad, nightFactor };
 }

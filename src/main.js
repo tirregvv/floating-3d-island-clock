@@ -7,6 +7,7 @@ import { createMaterials } from "./materials.js";
 import { buildTerrain } from "./world/terrain.js";
 import { buildCabin } from "./world/cabin.js";
 import { buildVegetation } from "./world/vegetation.js";
+import { createFireflies } from "./world/fireflies.js";
 import { buildCelestial } from "./sky/celestial.js";
 import { createMainLights } from "./lights.js";
 import { createSkyPalette } from "./dayNight.js";
@@ -99,7 +100,8 @@ scene.add(islandGroup);
 const { tilePositions, grassGeo } = buildTerrain(islandGroup, materials, rng);
 const { cabinLight, cabinSnowMaterial } = buildCabin(islandGroup, materials, tilePositions, renderStyle);
 const treeSnowMaterials = [];
-const { treeMeshes } = buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials, sceneCounts);
+const { treeMeshes, rockColliders } = buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials, sceneCounts);
+const fireflies = createFireflies(islandGroup, tilePositions, treeMeshes, rockColliders, rng, embeddedDisplay);
 
 const celestial = buildCelestial(scene, celestialShell, materials, rng, renderStyle, sceneCounts);
 const mainLights = createMainLights(scene, renderStyle);
@@ -282,6 +284,8 @@ startAnimationLoop({
 	moonShaderUniforms: celestial.moonShaderUniforms,
 	weatherCtx,
 	cabinLight,
+	fireflies,
+	prefersReducedMotion,
 	controls,
 	camera,
 	renderer,
