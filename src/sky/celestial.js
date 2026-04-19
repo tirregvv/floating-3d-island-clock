@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import * as config from "../config.js";
 
-export function buildCelestial(scene, celestialShell, materials, rng, isMobileDevice = false) {
+export function buildCelestial(scene, celestialShell, materials, rng, renderStyle, counts) {
 	const c = config.celestial;
 	const col = config.colors;
 	const clouds = [];
+	const cnt = counts ?? config.counts;
 
-	for (let i = 0; i < config.counts.baseClouds; i++) {
+	for (let i = 0; i < cnt.baseClouds; i++) {
 		const cloud = new THREE.Group();
 		const count = 4 + Math.floor(rng() * 4);
 		for (let j = 0; j < count; j++) {
@@ -112,8 +113,8 @@ export function buildCelestial(scene, celestialShell, materials, rng, isMobileDe
 
 	const L = config.lights;
 	const moonLight = new THREE.DirectionalLight(L.moonLightColor, 0.0);
-	moonLight.castShadow = true;
-	const moonShadowSz = isMobileDevice ? L.moonShadowMapSizeMobile : L.moonShadowMapSize;
+	moonLight.castShadow = renderStyle.shadowMapsEnabled;
+	const moonShadowSz = renderStyle.compactShadowMaps ? L.moonShadowMapSizeMobile : L.moonShadowMapSize;
 	moonLight.shadow.mapSize.set(moonShadowSz, moonShadowSz);
 	moonLight.shadow.camera.left = -16;
 	moonLight.shadow.camera.right = 16;
@@ -133,7 +134,7 @@ export function buildCelestial(scene, celestialShell, materials, rng, isMobileDe
 	sunMesh.name = "sun";
 	scene.add(sunMesh);
 
-	const starCount = config.counts.stars;
+	const starCount = cnt.stars;
 	const starGeo = new THREE.BufferGeometry();
 	const starPos = new Float32Array(starCount * 3);
 	// Uniform points on a sphere (infinite-distance star field). Allows stars down to the

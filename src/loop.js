@@ -15,21 +15,26 @@ export function startAnimationLoop({
 	camera,
 	renderer,
 	scene,
+	embeddedDisplay = false,
 }) {
 	const timer = new THREE.Timer();
 	const anim = config.animation;
+	const tvAnim = embeddedDisplay ? config.embeddedDisplayAnimation : null;
+	const motionScale = tvAnim ? tvAnim.motionScale : 1;
+	const cloudBobScale = tvAnim ? tvAnim.cloudBobScale : 1;
 
 	function animate() {
 		timer.update();
 		const elapsed = timer.getElapsed();
 		const dt = Math.min(timer.getDelta(), anim.maxDelta);
 
-		islandGroup.rotation.y = elapsed * anim.islandRotationSpeed;
+		islandGroup.rotation.y = elapsed * anim.islandRotationSpeed * motionScale;
 
 		updateFallingStars(dt);
 
+		const bob = anim.cloudBobFactor * cloudBobScale;
 		for (const cloud of clouds) {
-			cloud.position.y += Math.sin(elapsed * anim.cloudBobPhase + cloud.userData.startX) * anim.cloudBobFactor;
+			cloud.position.y += Math.sin(elapsed * anim.cloudBobPhase + cloud.userData.startX) * bob;
 		}
 
 		const dayState = updateDayNightCycle(dayNightCtx);

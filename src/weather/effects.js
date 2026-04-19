@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import * as config from "../config.js";
 
-export function buildWeatherEffects(scene, islandGroup, tilePositions, grassGeo) {
-	const n = config.counts;
+export function buildWeatherEffects(scene, islandGroup, tilePositions, grassGeo, counts) {
+	const n = counts ?? config.counts;
 	const col = config.colors;
 	const stormCloudMats = [];
 	const stormClouds = [];

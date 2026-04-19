@@ -29,7 +29,7 @@ function buildTreeTypeList(rng, total) {
 	return types;
 }
 
-export function buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials) {
+export function buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials, counts) {
 	const {
 		trunkMat,
 		leavesMat,
@@ -42,7 +42,7 @@ export function buildVegetation(islandGroup, materials, tilePositions, rng, tree
 		flowerPetalMats,
 		snowMat,
 	} = materials;
-	const n = config.counts;
+	const n = counts ?? config.counts;
 	const wcfg = config.weather;
 
 	function addConeSnowCap(foliage, yLocal, coneR, coneH, treeSnowMaterials) {

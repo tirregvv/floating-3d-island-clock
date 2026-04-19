@@ -1,10 +1,75 @@
 /** Central tweakables for the island clock app. */
 
+/** Matches typical phone/tablet browsers; also used by isConstrainedMobileClient in utils/gpuProfile.js. */
 export const mobileUserAgentRe = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/;
+
+/**
+ * Heuristics for evaluateGpuProfile() — WebGL limits and coarse hardware hints (desktop + TV).
+ * Handhelds additionally skip shadow maps in buildRenderStyle() regardless of these limits — reported
+ * capabilities often allow shadows while drivers still fail (black output); see three.js shadow discussions.
+ */
+export const gpuProfileThresholds = {
+	/** Below this MAX_TEXTURE_SIZE, shadow maps are disabled entirely. */
+	minTextureSizeForShadows: 4096,
+	/** Below this MAX_RENDERBUFFER_SIZE, shadow maps are disabled (some embed GPUs). */
+	minRenderbufferSizeForShadows: 8192,
+	/** Below this MAX_CUBE_MAP_TEXTURE_SIZE, shadow maps are disabled. */
+	minCubeMapTextureSizeForShadows: 2048,
+	/**
+	 * WebGL1 only: below this MAX_TEXTURE_SIZE, shadows are disabled.
+	 * (WebGL2 browsers are gated by minTextureSizeForShadows.)
+	 */
+	webgl1MinTextureSizeForShadows: 4096,
+	/**
+	 * At or below this MAX_TEXTURE_SIZE, use compact (mobile) shadow atlas sizes when shadows stay on.
+	 * Cards that cap at 8192 still work but benefit from smaller maps.
+	 */
+	fullTierMinTextureSize: 12288,
+	/** deviceMemory (GiB) — if reported, disable shadows at or below this. */
+	disableShadowsDeviceMemoryGb: 2,
+	/** deviceMemory (GiB) — if reported, prefer compact shadow maps at or below this. */
+	reduceShadowsDeviceMemoryGb: 4,
+	/** CPU cores — at or below this, prefer compact shadow maps (optional API). */
+	reduceShadowsHardwareConcurrency: 4,
+	/** deviceMemory (GiB) — suggest brighter fill light when at or below (optional API). */
+	boostFillLightingDeviceMemoryGb: 4,
+	/**
+	 * Narrow embedded-TV / STB UA: if MAX_TEXTURE_SIZE is below this, shadow maps are disabled.
+	 * Many living-room browsers report moderate limits; this avoids a known broken “full” path.
+	 */
+	embeddedTvDisableShadowsBelowTextureSize: 16384,
+};
 
 export const renderer = {
 	maxPixelRatio: 2,
+	/**
+	 * Smart TV browsers: render fewer physical pixels (4K × DPR is brutal on TV SoCs).
+	 * See three.js forum notes on capping devicePixelRatio for sustained frame times.
+	 */
+	embeddedMaxPixelRatio: 1,
 	toneMappingExposure: 1.0,
+};
+
+/** Multiply particle/mesh counts when isEmbeddedDisplayClient (utils/gpuProfile.js) is true. */
+export const embeddedDisplayScale = {
+	trees: 0.82,
+	rocks: 0.82,
+	flowers: 0.72,
+	baseClouds: 0.65,
+	stormClouds: 0.58,
+	rainDrops: 0.48,
+	puddles: 0.55,
+	leafParticles: 0.48,
+	snowFlakes: 0.48,
+	stars: 0.55,
+};
+
+/** Softer motion on TVs (less vertex churn per frame from bobbing/sway). */
+export const embeddedDisplayAnimation = {
+	/** Multiplies island spin rate. */
+	motionScale: 0.62,
+	/** Multiplies cloud vertical bob amplitude in the animation loop. */
+	cloudBobScale: 0.55,
 };
 
 export const camera = {
@@ -277,6 +342,6 @@ export const materials = {
 	lanternEmissiveIntensity: 0.3,
 	snowOpacity: 0.95,
 	sunMeshOpacity: 0.95,
-	leafOpacity: 0.85,
+	leafOpacity: 0.55,
 	snowFlakeOpacity: 0.85,
 };

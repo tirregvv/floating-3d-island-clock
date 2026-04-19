@@ -16,23 +16,48 @@ import { bindTimeUi } from "./ui/timeUi.js";
 import { bindFullscreenToggle } from "./ui/fullscreenUi.js";
 import { setWeatherLabel, setLocationWeatherOverlay } from "./ui/weatherUi.js";
 import { startAnimationLoop } from "./loop.js";
+import { evaluateGpuProfile, buildRenderStyle, isConstrainedMobileClient, isEmbeddedDisplayClient } from "./utils/gpuProfile.js";
+import { getEffectiveSceneCounts } from "./utils/sceneQuality.js";
+import { setupScreenWakeLock } from "./utils/screenWakeLock.js";
 
 const prefersReducedMotion =
 	typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const canvas = document.getElementById("canvas");
 const scene = new THREE.Scene();
-const isMobileDevice = config.mobileUserAgentRe.test(navigator.userAgent);
 
 const cam = config.camera;
 const camera = new THREE.PerspectiveCamera(cam.fov, window.innerWidth / window.innerHeight, cam.near, cam.far);
 camera.position.set(...cam.position);
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+const embeddedDisplay = isEmbeddedDisplayClient(navigator.userAgent);
+const sceneCounts = getEffectiveSceneCounts(embeddedDisplay);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !embeddedDisplay, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.renderer.maxPixelRatio));
-renderer.shadowMap.enabled = !isMobileDevice;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.setPixelRatio(
+	Math.min(
+		window.devicePixelRatio,
+		embeddedDisplay ? config.renderer.embeddedMaxPixelRatio : config.renderer.maxPixelRatio,
+	),
+);
+
+const constrainedMobile = isConstrainedMobileClient(navigator);
+const gpuProfile = evaluateGpuProfile(renderer);
+const renderStyle = buildRenderStyle(gpuProfile, constrainedMobile);
+if (import.meta.env.DEV) {
+	console.info("[gpuProfile]", {
+		embeddedDisplay,
+		constrainedMobile,
+		renderStyle,
+		reasons: gpuProfile.reasons,
+		debug: gpuProfile.debug,
+	});
+}
+
+renderer.shadowMap.enabled = renderStyle.shadowMapsEnabled;
+renderer.shadowMap.type =
+	embeddedDisplay && renderStyle.shadowMapsEnabled ? THREE.BasicShadowMap : THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = config.renderer.toneMappingExposure;
 
@@ -63,6 +88,8 @@ const weatherCountdown = document.getElementById("weather-countdown");
 const fullscreenToggle = document.getElementById("fullscreen-toggle");
 bindFullscreenToggle(fullscreenToggle);
 
+setupScreenWakeLock();
+
 const rng = seededRandom(config.terrain.rngSeed);
 const materials = createMaterials();
 const islandGroup = new THREE.Group();
@@ -70,15 +97,15 @@ islandGroup.name = "islandGroup";
 scene.add(islandGroup);
 
 const { tilePositions, grassGeo } = buildTerrain(islandGroup, materials, rng);
-const { cabinLight, cabinSnowMaterial } = buildCabin(islandGroup, materials, tilePositions, isMobileDevice);
+const { cabinLight, cabinSnowMaterial } = buildCabin(islandGroup, materials, tilePositions, renderStyle);
 const treeSnowMaterials = [];
-const { treeMeshes } = buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials);
+const { treeMeshes } = buildVegetation(islandGroup, materials, tilePositions, rng, treeSnowMaterials, sceneCounts);
 
-const celestial = buildCelestial(scene, celestialShell, materials, rng, isMobileDevice);
-const mainLights = createMainLights(scene, isMobileDevice);
+const celestial = buildCelestial(scene, celestialShell, materials, rng, renderStyle, sceneCounts);
+const mainLights = createMainLights(scene, renderStyle);
 const skyPalette = createSkyPalette();
 
-const effects = buildWeatherEffects(scene, islandGroup, tilePositions, grassGeo);
+const effects = buildWeatherEffects(scene, islandGroup, tilePositions, grassGeo, sceneCounts);
 
 const observerLat = { rad: (config.dayNight.defaultLatitudeDeg / 180) * Math.PI };
 
@@ -259,10 +286,13 @@ startAnimationLoop({
 	camera,
 	renderer,
 	scene,
+	embeddedDisplay,
 });
 
 window.addEventListener("resize", () => {
 	camera.aspect = window.innerWidth / window.innerHeight;
 	camera.updateProjectionMatrix();
+	const maxPr = embeddedDisplay ? config.renderer.embeddedMaxPixelRatio : config.renderer.maxPixelRatio;
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPr));
 	renderer.setSize(window.innerWidth, window.innerHeight);
 });
