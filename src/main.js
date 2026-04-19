@@ -15,6 +15,7 @@ import { buildWeatherEffects } from "./weather/effects.js";
 import { pickNextWeather, isSnowCategory } from "./weather/updateWeather.js";
 import { bindTimeUi } from "./ui/timeUi.js";
 import { bindFullscreenToggle } from "./ui/fullscreenUi.js";
+import { bindPerformanceModal } from "./ui/performanceModal.js";
 import { setWeatherLabel, setLocationWeatherOverlay } from "./ui/weatherUi.js";
 import { startAnimationLoop } from "./loop.js";
 import { evaluateGpuProfile, buildRenderStyle, isConstrainedMobileClient, isEmbeddedDisplayClient } from "./utils/gpuProfile.js";
@@ -88,6 +89,28 @@ const weatherLabel = document.getElementById("weather-label");
 const weatherCountdown = document.getElementById("weather-countdown");
 const fullscreenToggle = document.getElementById("fullscreen-toggle");
 bindFullscreenToggle(fullscreenToggle);
+
+const perfToggle = document.getElementById("perf-toggle");
+const perfDialog = document.getElementById("perf-dialog");
+const perfDialogClose = document.getElementById("perf-dialog-close");
+const perfStatsMount = document.getElementById("perf-stats-mount");
+const perfDetails = document.getElementById("perf-details");
+const perfWarnings = document.getElementById("perf-warnings");
+
+const afterRender = bindPerformanceModal({
+	dialog: perfDialog,
+	openButton: perfToggle,
+	closeButton: perfDialogClose,
+	statsMount: perfStatsMount,
+	detailsEl: perfDetails,
+	warningsEl: perfWarnings,
+	getContext: () => ({
+		gpuProfile,
+		renderStyle,
+		embeddedDisplay,
+		constrainedMobile,
+	}),
+});
 
 setupScreenWakeLock();
 
@@ -291,6 +314,7 @@ startAnimationLoop({
 	renderer,
 	scene,
 	embeddedDisplay,
+	afterRender,
 });
 
 window.addEventListener("resize", () => {

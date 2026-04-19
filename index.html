@@ -30,11 +30,28 @@
 		</div>
 		<div id="weather-controls">
 			<div id="weather-controls-row">
+				<button type="button" id="perf-toggle" title="Performance" aria-haspopup="dialog" aria-expanded="false">
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M2 12h2"/><path d="M19.07 4.93l-1.41 1.41"/><path d="M22 12h-2"/><path d="m19.07 19.07-1.41-1.41"/><path d="M12 2v2"/><path d="m4.93 19.07 1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>
+				</button>
 				<button type="button" id="fullscreen-toggle" aria-pressed="false" title="Fullscreen"></button>
 				<button type="button" id="weather-label" title="Weather (title set on load)"></button>
 			</div>
 			<div id="weather-countdown"></div>
 		</div>
+		<dialog id="perf-dialog" aria-labelledby="perf-dialog-title">
+			<div id="perf-dialog-inner">
+				<header id="perf-dialog-header">
+					<h2 id="perf-dialog-title">Performance</h2>
+					<button type="button" id="perf-dialog-close" aria-label="Close">&#10005;</button>
+				</header>
+				<div id="perf-stats-mount"></div>
+				<pre id="perf-details" aria-live="polite"></pre>
+				<section id="perf-warnings-section">
+					<h3 id="perf-warnings-heading">Warnings &amp; errors (Three.js / WebGL)</h3>
+					<pre id="perf-warnings"></pre>
+				</section>
+			</div>
+		</dialog>
 		<script type="module" src="/src/main.js"></script>
 	</body>
 </html>

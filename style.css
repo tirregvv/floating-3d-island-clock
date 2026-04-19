@@ -206,6 +206,7 @@ canvas {
 	gap: 10px;
 }
 
+#perf-toggle,
 #fullscreen-toggle,
 #weather-label {
 	position: relative;
@@ -227,6 +228,7 @@ canvas {
 	white-space: nowrap;
 }
 
+#perf-toggle,
 #fullscreen-toggle {
 	text-align: center;
 	display: inline-flex;
@@ -241,12 +243,14 @@ canvas {
 	text-align: end;
 }
 
+#perf-toggle:hover,
 #fullscreen-toggle:hover,
 #weather-label:hover {
 	background: rgba(255, 255, 255, 0.12);
 	transform: translateY(-1px);
 }
 
+#perf-toggle:focus,
 #fullscreen-toggle:focus,
 #weather-label:focus {
 	outline: 2px solid rgba(126, 200, 227, 0.7);
@@ -284,12 +288,143 @@ canvas {
 html:fullscreen #slider-ui,
 html:fullscreen #weather-label,
 html:fullscreen #weather-countdown,
+html:fullscreen #perf-toggle,
 html:fullscreen #fullscreen-toggle,
 html:-webkit-full-screen #slider-ui,
 html:-webkit-full-screen #weather-label,
 html:-webkit-full-screen #weather-countdown,
+html:-webkit-full-screen #perf-toggle,
 html:-webkit-full-screen #fullscreen-toggle {
 	display: none !important;
+}
+
+html:fullscreen #perf-dialog,
+html:-webkit-full-screen #perf-dialog {
+	display: none !important;
+}
+
+#perf-dialog {
+	position: fixed;
+	inset: 0;
+	z-index: 400;
+	max-width: min(560px, calc(100vw - 32px));
+	max-height: min(90vh, 720px);
+	margin: auto;
+	padding: 0;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 14px;
+	background: rgba(12, 14, 20, 0.94);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	color: #e8eaef;
+	font-family: "Inter", sans-serif;
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+#perf-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+}
+
+#perf-dialog-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	max-height: min(90vh, 720px);
+	padding: 16px 18px 18px;
+}
+
+#perf-dialog-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+#perf-dialog-title {
+	font-size: 16px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	color: #fff;
+}
+
+#perf-dialog-close {
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#perf-dialog-close:hover {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+#perf-stats-mount {
+	min-height: 52px;
+}
+
+#perf-stats-mount .stats {
+	position: relative !important;
+	top: auto !important;
+	left: auto !important;
+	cursor: pointer;
+}
+
+#perf-details {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+	background: rgba(0, 0, 0, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	padding: 12px 14px;
+	overflow: auto;
+	max-height: 38vh;
+	flex: 1;
+	min-height: 0;
+	color: rgba(232, 234, 239, 0.92);
+}
+
+#perf-warnings-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-height: 0;
+}
+
+#perf-warnings-heading {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.4px;
+	color: rgba(255, 255, 255, 0.65);
+}
+
+#perf-warnings {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 10px;
+	line-height: 1.4;
+	white-space: pre-wrap;
+	word-break: break-word;
+	background: rgba(80, 40, 20, 0.35);
+	border: 1px solid rgba(255, 160, 80, 0.2);
+	border-radius: 10px;
+	padding: 10px 12px;
+	overflow: auto;
+	max-height: 22vh;
+	color: rgba(255, 220, 200, 0.9);
 }
 
 @media (max-width: 640px) {
@@ -366,6 +501,7 @@ html:-webkit-full-screen #fullscreen-toggle {
 		max-width: 100%;
 	}
 
+	#perf-toggle,
 	#fullscreen-toggle {
 		flex-shrink: 0;
 	}

@@ -18,6 +18,7 @@ export function startAnimationLoop({
 	renderer,
 	scene,
 	embeddedDisplay = false,
+	afterRender = null,
 }) {
 	const timer = new THREE.Timer();
 	const anim = config.animation;
@@ -55,6 +56,7 @@ export function startAnimationLoop({
 
 		controls.update();
 		renderer.render(scene, camera);
+		if (afterRender) afterRender(renderer, scene);
 	}
 
 	renderer.setAnimationLoop(animate);
