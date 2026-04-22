@@ -1,5 +1,6 @@
 import { audioMixerStorageKey } from "../audio/audioConfig.js";
 import { getAudioEngine } from "../audio/audioEngine.js";
+import { bindModalBackdropClose } from "./dialogBackdrop.js";
 
 /**
  * @param {object} p
@@ -64,6 +65,8 @@ export function bindAudioMixer({
 	});
 
 	closeButton.addEventListener("click", () => dialog.close());
+
+	bindModalBackdropClose(dialog);
 
 	dialog.addEventListener("close", () => setOpenAria(false));
 

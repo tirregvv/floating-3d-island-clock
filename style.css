@@ -388,36 +388,68 @@ canvas {
 	outline-offset: 2px;
 }
 
-#audio-dialog {
+/* Closed dialogs must stay hidden; `display: flex` on `<dialog>` overrides the UA and showed both at load. */
+#audio-dialog:not([open]),
+#perf-dialog:not([open]) {
+	display: none;
+}
+
+/* Full-viewport transparent shell when open — backdrop clicks hit `<dialog>` (dialogBackdrop.js). */
+#audio-dialog[open],
+#perf-dialog[open] {
 	position: fixed;
 	inset: 0;
 	z-index: 400;
 	box-sizing: border-box;
-	width: min(560px, calc(100vw - 32px));
-	max-height: min(90dvh, 640px);
-	margin: auto;
-	padding: 0;
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-radius: 16px;
-	background: rgba(12, 14, 20, 0.94);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
+	width: 100%;
+	max-width: none;
+	height: 100%;
+	max-height: none;
+	margin: 0;
+	padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+		max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
 	color: #e8eaef;
 	font-family: "Inter", sans-serif;
-	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
 }
 
-#audio-dialog::backdrop {
+#audio-dialog::backdrop,
+#perf-dialog::backdrop {
 	background: rgba(0, 0, 0, 0.55);
 	backdrop-filter: blur(4px);
 	-webkit-backdrop-filter: blur(4px);
 }
 
-#audio-dialog-inner {
+#audio-dialog-inner,
+#perf-dialog-inner {
+	width: min(560px, calc(100vw - 32px));
+	max-height: min(90dvh, 720px);
+	min-height: 0;
+	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
 	gap: 18px;
 	padding: 22px 24px 26px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 16px;
+	background: rgba(12, 14, 20, 0.94);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+	overflow: auto;
+}
+
+#perf-dialog-inner {
+	gap: 14px;
 }
 
 #audio-dialog-header {
@@ -518,38 +550,6 @@ html:-webkit-full-screen #audio-dialog {
 	display: none !important;
 }
 
-#perf-dialog {
-	position: fixed;
-	inset: 0;
-	z-index: 400;
-	max-width: min(560px, calc(100vw - 32px));
-	max-height: min(90vh, 720px);
-	margin: auto;
-	padding: 0;
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-radius: 14px;
-	background: rgba(12, 14, 20, 0.94);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
-	color: #e8eaef;
-	font-family: "Inter", sans-serif;
-	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
-}
-
-#perf-dialog::backdrop {
-	background: rgba(0, 0, 0, 0.55);
-	backdrop-filter: blur(4px);
-	-webkit-backdrop-filter: blur(4px);
-}
-
-#perf-dialog-inner {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	max-height: min(90vh, 720px);
-	padding: 16px 18px 18px;
-}
-
 #perf-dialog-header {
 	display: flex;
 	align-items: center;
@@ -558,7 +558,7 @@ html:-webkit-full-screen #audio-dialog {
 }
 
 #perf-dialog-title {
-	font-size: 16px;
+	font-size: 18px;
 	font-weight: 600;
 	letter-spacing: 0.5px;
 	color: #fff;
@@ -566,16 +566,16 @@ html:-webkit-full-screen #audio-dialog {
 
 #perf-dialog-close {
 	flex-shrink: 0;
-	width: 36px;
-	height: 36px;
+	width: 40px;
+	height: 40px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: 8px;
+	border-radius: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	background: rgba(255, 255, 255, 0.08);
 	color: #fff;
-	font-size: 16px;
+	font-size: 18px;
 	line-height: 1;
 	cursor: pointer;
 	transition: background 0.15s;
@@ -721,23 +721,27 @@ html:-webkit-full-screen #audio-dialog {
 		flex-shrink: 0;
 	}
 
-	#audio-dialog {
+	#audio-dialog-inner,
+	#perf-dialog-inner {
 		width: calc(100vw - 16px);
 		max-width: none;
 		max-height: min(88dvh, 720px);
 		border-radius: 18px;
-	}
-
-	#audio-dialog-inner {
 		padding: 24px clamp(18px, 4vw, 26px) 28px;
 		gap: 22px;
 	}
 
-	#audio-dialog-title {
+	#perf-dialog-inner {
+		gap: 18px;
+	}
+
+	#audio-dialog-title,
+	#perf-dialog-title {
 		font-size: 20px;
 	}
 
-	#audio-dialog-close {
+	#audio-dialog-close,
+	#perf-dialog-close {
 		width: 44px;
 		height: 44px;
 		font-size: 20px;

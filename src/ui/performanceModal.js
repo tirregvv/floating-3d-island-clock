@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import Stats from "three/examples/jsm/libs/stats.module.js";
+import { bindModalBackdropClose } from "./dialogBackdrop.js";
 
 const WARN_RING_MAX = 100;
 
@@ -274,6 +275,8 @@ export function bindPerformanceModal({
 	closeButton.addEventListener("click", () => {
 		dialog.close();
 	});
+
+	bindModalBackdropClose(dialog);
 
 	dialog.addEventListener("close", () => {
 		livePerfFrame = null;
