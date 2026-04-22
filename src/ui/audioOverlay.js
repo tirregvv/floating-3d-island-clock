@@ -17,12 +17,28 @@ export function bindAudioStartGate({ overlay, button, engine }) {
 		overlay.classList.remove("audio-start-overlay--hidden");
 	};
 
+	function isUnlockedThisSession() {
+		try {
+			return sessionStorage.getItem(audioUnlockStorageKey) === "1";
+		} catch {
+			return false;
+		}
+	}
+
+	function markUnlockedThisSession() {
+		try {
+			sessionStorage.setItem(audioUnlockStorageKey, "1");
+		} catch {
+			/* ignore unavailable storage (some WebViews / privacy modes) */
+		}
+	}
+
 	async function tryAutoStart() {
 		if (alwaysShowStartGate) {
 			show();
 			return;
 		}
-		if (sessionStorage.getItem(audioUnlockStorageKey) !== "1") {
+		if (!isUnlockedThisSession()) {
 			show();
 			return;
 		}
@@ -34,7 +50,7 @@ export function bindAudioStartGate({ overlay, button, engine }) {
 	button.addEventListener("click", async () => {
 		const ok = await engine.resumeAndStart();
 		if (ok) {
-			sessionStorage.setItem(audioUnlockStorageKey, "1");
+			markUnlockedThisSession();
 			hide();
 		}
 	});
