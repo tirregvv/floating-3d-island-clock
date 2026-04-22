@@ -207,7 +207,6 @@ canvas {
 }
 
 #perf-toggle,
-#fullscreen-toggle,
 #weather-label {
 	position: relative;
 	font-family: "Inter", sans-serif;
@@ -228,8 +227,7 @@ canvas {
 	white-space: nowrap;
 }
 
-#perf-toggle,
-#fullscreen-toggle {
+#perf-toggle {
 	text-align: center;
 	display: inline-flex;
 	align-items: center;
@@ -244,14 +242,12 @@ canvas {
 }
 
 #perf-toggle:hover,
-#fullscreen-toggle:hover,
 #weather-label:hover {
 	background: rgba(255, 255, 255, 0.12);
 	transform: translateY(-1px);
 }
 
 #perf-toggle:focus,
-#fullscreen-toggle:focus,
 #weather-label:focus {
 	outline: 2px solid rgba(126, 200, 227, 0.7);
 	outline-offset: 2px;
@@ -507,13 +503,11 @@ html:fullscreen #weather-label,
 html:fullscreen #weather-countdown,
 html:fullscreen #perf-toggle,
 html:fullscreen #audio-toggle,
-html:fullscreen #fullscreen-toggle,
 html:-webkit-full-screen #slider-ui,
 html:-webkit-full-screen #weather-label,
 html:-webkit-full-screen #weather-countdown,
 html:-webkit-full-screen #perf-toggle,
-html:-webkit-full-screen #audio-toggle,
-html:-webkit-full-screen #fullscreen-toggle {
+html:-webkit-full-screen #audio-toggle {
 	display: none !important;
 }
 
@@ -723,8 +717,7 @@ html:-webkit-full-screen #audio-dialog {
 	}
 
 	#perf-toggle,
-	#audio-toggle,
-	#fullscreen-toggle {
+	#audio-toggle {
 		flex-shrink: 0;
 	}
 

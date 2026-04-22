@@ -14,7 +14,7 @@ import { createSkyPalette } from "./dayNight.js";
 import { buildWeatherEffects } from "./weather/effects.js";
 import { pickNextWeather, isSnowCategory } from "./weather/updateWeather.js";
 import { bindTimeUi } from "./ui/timeUi.js";
-import { bindFullscreenToggle } from "./ui/fullscreenUi.js";
+import { bindFullscreenDoubleClick } from "./ui/fullscreenUi.js";
 import { bindPerformanceModal } from "./ui/performanceModal.js";
 import { setWeatherLabel, setLocationWeatherOverlay } from "./ui/weatherUi.js";
 import { startAnimationLoop } from "./loop.js";
@@ -90,8 +90,7 @@ bindTimeUi(timeSlider, resetBtn);
 
 const weatherLabel = document.getElementById("weather-label");
 const weatherCountdown = document.getElementById("weather-countdown");
-const fullscreenToggle = document.getElementById("fullscreen-toggle");
-bindFullscreenToggle(fullscreenToggle);
+bindFullscreenDoubleClick(renderer.domElement);
 
 const perfToggle = document.getElementById("perf-toggle");
 const perfDialog = document.getElementById("perf-dialog");
