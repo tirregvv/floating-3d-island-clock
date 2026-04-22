@@ -28,8 +28,18 @@
 				<button type="button" id="reset-btn">&#8635; Reset</button>
 			</div>
 		</div>
+		<div id="audio-start-overlay" class="audio-start-overlay">
+			<div class="audio-start-card">
+				<p class="audio-start-title">Floating island</p>
+				<p class="audio-start-hint">Tap below to start experiencing the cozy floating island clock.</p>
+				<button type="button" id="audio-start-btn" class="audio-start-btn">Enter</button>
+			</div>
+		</div>
 		<div id="weather-controls">
 			<div id="weather-controls-row">
+				<button type="button" id="audio-toggle" title="Audio" aria-haspopup="dialog" aria-expanded="false">
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+				</button>
 				<button type="button" id="perf-toggle" title="Performance" aria-haspopup="dialog" aria-expanded="false">
 					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M2 12h2"/><path d="M19.07 4.93l-1.41 1.41"/><path d="M22 12h-2"/><path d="m19.07 19.07-1.41-1.41"/><path d="M12 2v2"/><path d="m4.93 19.07 1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>
 				</button>
@@ -38,6 +48,24 @@
 			</div>
 			<div id="weather-countdown"></div>
 		</div>
+		<dialog id="audio-dialog" aria-labelledby="audio-dialog-title">
+			<div id="audio-dialog-inner">
+				<header id="audio-dialog-header">
+					<h2 id="audio-dialog-title">Audio</h2>
+					<button type="button" id="audio-dialog-close" aria-label="Close">&#10005;</button>
+				</header>
+				<div class="audio-mixer-rows">
+					<label class="audio-mixer-label" for="audio-slider-master">Master</label>
+					<input type="range" id="audio-slider-master" min="0" max="1" step="0.01" value="0.85" />
+					<label class="audio-mixer-label" for="audio-slider-music">Theme</label>
+					<input type="range" id="audio-slider-music" min="0" max="1" step="0.01" value="0.55" />
+					<label class="audio-mixer-label" for="audio-slider-music-bed">Background</label>
+					<input type="range" id="audio-slider-music-bed" min="0" max="1" step="0.01" value="0.45" />
+					<label class="audio-mixer-label" for="audio-slider-weather">Weather</label>
+					<input type="range" id="audio-slider-weather" min="0" max="1" step="0.01" value="0.5" />
+				</div>
+			</div>
+		</dialog>
 		<dialog id="perf-dialog" aria-labelledby="perf-dialog-title">
 			<div id="perf-dialog-inner">
 				<header id="perf-dialog-header">

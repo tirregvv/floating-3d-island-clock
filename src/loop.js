@@ -2,6 +2,7 @@ import * as THREE from "three";
 import * as config from "./config.js";
 import { updateDayNightCycle } from "./dayNight.js";
 import { updateWeather } from "./weather/updateWeather.js";
+import { syncBackgroundMusicPhase } from "./audio/dayNightBedAudio.js";
 
 export function startAnimationLoop({
 	islandGroup,
@@ -41,6 +42,7 @@ export function startAnimationLoop({
 		}
 
 		const dayState = updateDayNightCycle(dayNightCtx);
+		syncBackgroundMusicPhase(dayState.nightFactor ?? 0);
 		moonShaderUniforms.uTime.value = elapsed;
 		updateWeather(elapsed, dt, dayState, weatherCtx);
 

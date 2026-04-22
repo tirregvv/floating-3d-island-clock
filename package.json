@@ -1,5 +1,5 @@
 {
-	"name": "floating-island-3d-clock",
+	"name": "floating-island-clock",
 	"private": true,
 	"version": "1.0.0",
 	"type": "module",
@@ -9,6 +9,9 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@capacitor/android": "^8.3.1",
+		"@capacitor/cli": "^8.3.1",
+		"@capacitor/core": "^8.3.1",
 		"three": "^0.183.2"
 	},
 	"devDependencies": {

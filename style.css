@@ -285,21 +285,242 @@ canvas {
 	color: rgba(255, 255, 255, 0.75);
 }
 
+.audio-start-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 500;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(0, 0, 0, 0.72);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	font-family: "Inter", sans-serif;
+}
+
+.audio-start-overlay[hidden],
+.audio-start-overlay--hidden {
+	display: none !important;
+}
+
+.audio-start-card {
+	max-width: 380px;
+	width: 100%;
+	padding: 28px 26px 26px;
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(12, 14, 20, 0.92);
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+	text-align: center;
+}
+
+.audio-start-title {
+	font-size: 20px;
+	font-weight: 600;
+	color: #fff;
+	letter-spacing: 0.5px;
+	margin-bottom: 10px;
+}
+
+.audio-start-hint {
+	font-size: 14px;
+	line-height: 1.45;
+	color: rgba(255, 255, 255, 0.62);
+	margin-bottom: 22px;
+}
+
+.audio-start-btn {
+	width: 100%;
+	padding: 12px 20px;
+	border-radius: 10px;
+	border: 1px solid rgba(126, 200, 227, 0.45);
+	background: rgba(126, 200, 227, 0.22);
+	color: #fff;
+	font-family: "Inter", sans-serif;
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: 1px;
+	cursor: pointer;
+	transition:
+		background 0.18s,
+		transform 0.18s;
+}
+
+.audio-start-btn:hover {
+	background: rgba(126, 200, 227, 0.35);
+	transform: translateY(-1px);
+}
+
+.audio-start-btn:focus {
+	outline: 2px solid rgba(126, 200, 227, 0.7);
+	outline-offset: 2px;
+}
+
+#audio-toggle {
+	position: relative;
+	font-family: "Inter", sans-serif;
+	background: rgba(0, 0, 0, 0.32);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 10px;
+	padding: 7px 12px;
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 1px;
+	cursor: pointer;
+	transition:
+		background 0.18s,
+		transform 0.18s;
+	text-align: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 0;
+	min-width: 40px;
+}
+
+#audio-toggle:hover {
+	background: rgba(255, 255, 255, 0.12);
+	transform: translateY(-1px);
+}
+
+#audio-toggle:focus {
+	outline: 2px solid rgba(126, 200, 227, 0.7);
+	outline-offset: 2px;
+}
+
+#audio-dialog {
+	position: fixed;
+	inset: 0;
+	z-index: 400;
+	box-sizing: border-box;
+	width: min(560px, calc(100vw - 32px));
+	max-height: min(90dvh, 640px);
+	margin: auto;
+	padding: 0;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 16px;
+	background: rgba(12, 14, 20, 0.94);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	color: #e8eaef;
+	font-family: "Inter", sans-serif;
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+#audio-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+}
+
+#audio-dialog-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 22px 24px 26px;
+}
+
+#audio-dialog-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+#audio-dialog-title {
+	font-size: 18px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	color: #fff;
+}
+
+#audio-dialog-close {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#audio-dialog-close:hover {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+.audio-mixer-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.audio-mixer-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.55);
+	letter-spacing: 1.2px;
+}
+
+.audio-mixer-rows input[type="range"] {
+	width: 100%;
+	-webkit-appearance: none;
+	appearance: none;
+	height: 8px;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.2);
+	cursor: pointer;
+}
+
+.audio-mixer-rows input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #7ec8e3;
+	box-shadow: 0 0 10px rgba(126, 200, 227, 0.85);
+	cursor: pointer;
+}
+
+.audio-mixer-rows input[type="range"]::-moz-range-thumb {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: none;
+	background: #7ec8e3;
+	box-shadow: 0 0 10px rgba(126, 200, 227, 0.85);
+	cursor: pointer;
+}
+
 html:fullscreen #slider-ui,
 html:fullscreen #weather-label,
 html:fullscreen #weather-countdown,
 html:fullscreen #perf-toggle,
+html:fullscreen #audio-toggle,
 html:fullscreen #fullscreen-toggle,
 html:-webkit-full-screen #slider-ui,
 html:-webkit-full-screen #weather-label,
 html:-webkit-full-screen #weather-countdown,
 html:-webkit-full-screen #perf-toggle,
+html:-webkit-full-screen #audio-toggle,
 html:-webkit-full-screen #fullscreen-toggle {
 	display: none !important;
 }
 
 html:fullscreen #perf-dialog,
-html:-webkit-full-screen #perf-dialog {
+html:fullscreen #audio-dialog,
+html:-webkit-full-screen #perf-dialog,
+html:-webkit-full-screen #audio-dialog {
 	display: none !important;
 }
 
@@ -502,8 +723,54 @@ html:-webkit-full-screen #perf-dialog {
 	}
 
 	#perf-toggle,
+	#audio-toggle,
 	#fullscreen-toggle {
 		flex-shrink: 0;
+	}
+
+	#audio-dialog {
+		width: calc(100vw - 16px);
+		max-width: none;
+		max-height: min(88dvh, 720px);
+		border-radius: 18px;
+	}
+
+	#audio-dialog-inner {
+		padding: 24px clamp(18px, 4vw, 26px) 28px;
+		gap: 22px;
+	}
+
+	#audio-dialog-title {
+		font-size: 20px;
+	}
+
+	#audio-dialog-close {
+		width: 44px;
+		height: 44px;
+		font-size: 20px;
+	}
+
+	.audio-mixer-rows {
+		gap: 22px;
+	}
+
+	.audio-mixer-label {
+		font-size: 14px;
+		letter-spacing: 1px;
+	}
+
+	.audio-mixer-rows input[type="range"] {
+		height: 10px;
+	}
+
+	.audio-mixer-rows input[type="range"]::-webkit-slider-thumb {
+		width: 28px;
+		height: 28px;
+	}
+
+	.audio-mixer-rows input[type="range"]::-moz-range-thumb {
+		width: 28px;
+		height: 28px;
 	}
 
 	/* Fullscreen on small screens: location/weather top-center, time/date bottom-center */

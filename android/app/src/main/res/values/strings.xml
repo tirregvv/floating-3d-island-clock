@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">floating-island-clock</string>
+    <string name="title_activity_main">floating-island-clock</string>
+    <string name="package_name">nl.tirregvv.app</string>
+    <string name="custom_url_scheme">nl.tirregvv.app</string>
+</resources>

@@ -21,9 +21,12 @@ import { startAnimationLoop } from "./loop.js";
 import { evaluateGpuProfile, buildRenderStyle, isConstrainedMobileClient, isEmbeddedDisplayClient } from "./utils/gpuProfile.js";
 import { getEffectiveSceneCounts } from "./utils/sceneQuality.js";
 import { setupScreenWakeLock } from "./utils/screenWakeLock.js";
+import { initAudio } from "./audio/initAudio.js";
 
 const prefersReducedMotion =
 	typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+initAudio(prefersReducedMotion);
 
 const canvas = document.getElementById("canvas");
 const scene = new THREE.Scene();

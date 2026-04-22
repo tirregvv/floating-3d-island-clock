@@ -3,6 +3,7 @@ import * as config from "../config.js";
 import { mapToSceneWeather } from "../../weatherEngine.js";
 import { getDayProgress } from "../timeState.js";
 import { setWeatherLabel, setLocationWeatherOverlay } from "../ui/weatherUi.js";
+import { driveWeatherAudio, playThunderRollSfx } from "../audio/weatherAudio.js";
 
 export function isSnowCategory(w) {
 	return w === "snow" || w === "snowstorm";
@@ -333,6 +334,7 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 	if (isStorm && tAct > 0.08 && now > wx.nextThunder) {
 		wx.thunderFlash = (2 + Math.random() * 1.8) * (0.35 + tAct * 0.65);
 		wx.nextThunder = now + thunderGap * (0.5 + Math.random() * 0.5);
+		playThunderRollSfx();
 	}
 	if (wx.thunderFlash > 0) {
 		wx.thunderFlash = Math.max(0, wx.thunderFlash - dt * wcfg.thunderDecay);
@@ -351,4 +353,6 @@ export function updateWeather(elapsed, dt, dayState, ctx) {
 		ctx.thunderLight.intensity = 0;
 		ctx.thunderFill.intensity = 0;
 	}
+
+	driveWeatherAudio(ctx);
 }
